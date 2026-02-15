@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="es">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Panel de Administración - GRUPO FERRENORTE</title>
+    <link rel="stylesheet" href="admin-styles.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+        rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+</head>
+
+<body>
+    <!-- Login Screen -->
+    <div id="loginScreen" class="login-screen">
+        <div class="login-container">
+            <div class="login-header">
+                <i class="fas fa-shield-alt"></i>
+                <h1>Panel de Administración</h1>
+                <p>GRUPO FERRENORTE RO&MY E.I.R.L</p>
+            </div>
+            <form id="loginForm" class="login-form">
+                <div class="form-group">
+                    <label for="loginEmail">
+                        <i class="fas fa-envelope"></i>
+                        Correo Electrónico
+                    </label>
+                    <input type="email" id="loginEmail" placeholder="admin@grupoferrenorte.com" required>
+                </div>
+                <div class="form-group">
+                    <label for="loginPassword">
+                        <i class="fas fa-lock"></i>
+                        Contraseña
+                    </label>
+                    <input type="password" id="loginPassword" placeholder="••••••••" required>
+                </div>
+                <button type="submit" class="btn btn-primary">
+                    <i class="fas fa-sign-in-alt"></i>
+                    Iniciar Sesión
+                </button>
+                <div id="loginError" class="error-message" style="display: none;"></div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Admin Dashboard -->
+    <div id="adminDashboard" class="admin-dashboard" style="display: none;">
+        <!-- Sidebar -->
+        <aside class="sidebar">
+            <div class="sidebar-header">
+                <img src="img/logo.jpeg" alt="Logo" class="sidebar-logo">
+                <h2>GRUPO FERRENORTE</h2>
+                <p id="adminEmail" class="admin-email"></p>
+            </div>
+            <nav class="sidebar-nav">
+                <a href="#" data-section="productos" class="nav-item active">
+                    <i class="fas fa-box"></i>
+                    <span>Productos</span>
+                </a>
+                <a href="#" data-section="categorias" class="nav-item">
+                    <i class="fas fa-tags"></i>
+                    <span>Categorías</span>
+                </a>
+                <a href="#" id="logoutBtn" class="nav-item logout">
+                    <i class="fas fa-sign-out-alt"></i>
+                    <span>Cerrar Sesión</span>
+                </a>
+                <a href="#" data-section="configuracion" class="nav-item config-btn"
+                    style="margin-top: auto; border-top: 1px solid rgba(255, 255, 255, 0.2); padding-top: 16px;">
+                    <i class="fas fa-cog"></i>
+                    <span>Configuración</span>
+                </a>
+            </nav>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="main-content">
+            <!-- Header -->
+            <header class="content-header">
+                <button id="mobileMenuBtn" class="mobile-menu-btn"
+                    style="display: none; background: none; border: none; font-size: 24px; color: var(--gray-800); cursor: pointer; margin-right: 16px;">
+                    <i class="fas fa-bars"></i>
+                </button>
+                <div class="header-title-wrapper" style="flex-grow: 1;">
+                    <h1 id="sectionTitle">Productos</h1>
+                </div>
+                <button id="addNewBtn" class="btn btn-primary">
+                    <i class="fas fa-plus"></i>
+                    <span>Agregar Nuevo</span>
+                </button>
+            </header>
+
+            <!-- Productos Section -->
+            <section id="productosSection" class="content-section active">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Imagen</th>
+                                <th>Título</th>
+                                <th>Precio</th>
+                                <th>Stock</th>
+                                <th>Descripción</th>
+                                <th>Badge</th>
+                                <th>Orden</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="productosTableBody">
+                            <!-- Datos cargados dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+
+            <!-- Categorías Section -->
+            <section id="categoriasSection" class="content-section">
+                <div class="table-container">
+                    <table class="data-table">
+                        <thead>
+                            <tr>
+                                <th>Icono</th>
+                                <th>Título</th>
+                                <th>Descripción</th>
+                                <th>Imágenes</th>
+                                <th>Badge</th>
+                                <th>Orden</th>
+                                <th>Estado</th>
+                                <th>Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody id="categoriasTableBody">
+                            <!-- Datos cargados dinámicamente -->
+                        </tbody>
+                    </table>
+                </div>
+            </section>
+            </section>
+
+            <!-- Configuración Section -->
+            <section id="configuracionSection" class="content-section">
+                <div class="config-container"
+                    style="background: white; padding: 32px; border-radius: 12px; box-shadow: var(--shadow-md);">
+                    <h2 class="section-subtitle" style="margin-bottom: 24px;">Configuración General del Sitio</h2>
+                    <form id="configForm">
+                        <input type="hidden" id="configId">
+
+                        <div class="form-group">
+                            <label for="configNombre">Nombre del Sitio / Empresa</label>
+                            <input type="text" id="configNombre" required
+                                placeholder="Ej: GRUPO FERRENORTE RO&MY E.I.R.L">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configDescripcion">Descripción del Sitio (SEO)</label>
+                            <textarea id="configDescripcion" rows="3"
+                                placeholder="Descripción breve para buscadores"></textarea>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configWhatsapp">Número de WhatsApp (Contacto)</label>
+                            <input type="text" id="configWhatsapp" placeholder="Ej: 51904068052 (sin símbolos)">
+                            <small>Solo números, incluir código de país (ej: 51).</small>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="configLogo">Logo del Sitio</label>
+                            <input type="file" id="configLogo" accept="image/*" class="file-input">
+                            <div id="configLogoPreview" class="image-preview" style="margin-top: 10px;"></div>
+                            <input type="hidden" id="configLogoUrl">
+                        </div>
+
+                        <button type="submit" class="btn btn-primary" style="margin-top: 24px;">
+                            <i class="fas fa-save"></i> Guardar Configuración
+                        </button>
+                    </form>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Modal para Producto -->
+    <div id="productoModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="productoModalTitle">Agregar Producto</h2>
+                <button class="modal-close" onclick="closeProductoModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="productoForm" class="modal-form">
+                <input type="hidden" id="productoId">
+
+                <div class="form-group">
+                    <label for="productoTitulo">Título *</label>
+                    <input type="text" id="productoTitulo" required placeholder="Ej: Herramientas Profesionales">
+                </div>
+
+                <div class="form-group">
+                    <label for="productoDescripcion">Descripción *</label>
+                    <textarea id="productoDescripcion" required rows="3"
+                        placeholder="Descripción breve del producto"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="productoCategoria">Categoría *</label>
+                    <select id="productoCategoria" required>
+                        <option value="">Selecciona una categoría...</option>
+                        <!-- Se llenará dinámicamente con JS -->
+                    </select>
+                </div>
+
+                <div class="form-group">
+                    <label for="productoImagen">Imagen del Producto *</label>
+                    <input type="file" id="productoImagen" accept="image/*" class="file-input">
+                    <div id="productoImagenPreview" class="image-preview"></div>
+                    <input type="hidden" id="productoImagenUrl">
+                    <small>Formatos: JPG, PNG, WEBP • Tamaño máx: 5MB</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productoBadge">Badge (Opcional)</label>
+                        <input type="text" id="productoBadge" placeholder="Ej: Popular, Nuevo">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoBadgeColor">Color del Badge</label>
+                        <select id="productoBadgeColor">
+                            <option value="default">Naranja/Azul</option>
+                            <option value="new">Verde (Nuevo)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productoOrden">Orden de visualización *</label>
+                        <input type="number" id="productoOrden" required value="0" min="0">
+                        <small>Número menor aparece primero</small>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoActivo">Estado</label>
+                        <select id="productoActivo">
+                            <option value="true">Activo (Visible)</option>
+                            <option value="false">Inactivo (Oculto)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="productoPrecio">Precio (S/.) *</label>
+                        <input type="number" id="productoPrecio" step="0.01" min="0" placeholder="0.00">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="productoStock">Stock (Cantidad) *</label>
+                        <input type="number" id="productoStock" min="0" placeholder="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="productoFichaFile">Subir Ficha Técnica (PDF/Word)</label>
+                    <input type="file" id="productoFichaFile" accept=".pdf,.doc,.docx" class="file-input">
+                    <div id="fichaFileStatus" style="font-size: 12px; margin-top: 5px; color: var(--gray-500);"></div>
+                    <small>Este archivo se podrá descargar desde la web.</small>
+                </div>
+
+                <div class="form-group">
+                    <label for="productoFicha">URL de Ficha o Detalles Manuales</label>
+                    <textarea id="productoFicha" rows="2"
+                        placeholder="Pega un link externo o deja en blanco si subiste un archivo arriba."></textarea>
+                    <small>Si subes un archivo arriba, este campo se llenará automáticamente con el link.</small>
+                </div>
+
+                <!-- Sección de Variantes (Colores/Medidas) -->
+                <div class="variants-admin-box"
+                    style="margin: 25px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid var(--gray-200);">
+                    <div
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                        <h3 style="font-size: 15px; font-weight: 800; color: var(--primary-blue); margin: 0;">
+                            <i class="fas fa-layer-group"></i> VARIANTES DEL PRODUCTO
+                        </h3>
+                        <button type="button" class="btn btn-secondary btn-sm" onclick="addVariantRow()"
+                            style="padding: 6px 12px; font-size: 13px; background: var(--white);">
+                            <i class="fas fa-plus"></i> Añadir Opción
+                        </button>
+                    </div>
+
+                    <div id="variantsContainer" style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- JS injected rows -->
+                    </div>
+                    <small style="display: block; margin-top: 15px; color: var(--gray-500);">
+                        Ej: Talla: XL, Color: Azul, Memoria: 128GB. El precio sobreescribe al base si es > 0.
+                    </small>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeProductoModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal para Categoría -->
+    <div id="categoriaModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="categoriaModalTitle">Agregar Categoría</h2>
+                <button class="modal-close" onclick="closeCategoriaModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <form id="categoriaForm" class="modal-form">
+                <input type="hidden" id="categoriaId">
+
+                <div class="form-group">
+                    <label for="categoriaTitulo">Título *</label>
+                    <input type="text" id="categoriaTitulo" required placeholder="Ej: Productos Ferreteros">
+                </div>
+
+                <div class="form-group">
+                    <label for="categoriaIcon">Icono Font Awesome *</label>
+                    <input type="text" id="categoriaIcon" required placeholder="Ej: fas fa-hammer">
+                    <small>Busca iconos en <a href="https://fontawesome.com/icons"
+                            target="_blank">FontAwesome</a></small>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoriaDescripcion">Descripción *</label>
+                    <textarea id="categoriaDescripcion" required rows="4"
+                        placeholder="Descripción de la categoría"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoriaImagenes">Imágenes de la Categoría (4 imágenes) *</label>
+                    <input type="file" id="categoriaImagenes" accept="image/*" multiple class="file-input">
+                    <div id="categoriaImagenesPreview" class="images-preview"></div>
+                    <input type="hidden" id="categoriaImagenesUrls">
+                    <small>Selecciona 4 imágenes • Formatos: JPG, PNG, WEBP</small>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="categoriaBadge">Badge (Opcional)</label>
+                        <input type="text" id="categoriaBadge" placeholder="Ej: Especialidad">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="categoriaOrden">Orden *</label>
+                        <input type="number" id="categoriaOrden" required value="0" min="0">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label for="categoriaActivo">Estado</label>
+                    <select id="categoriaActivo">
+                        <option value="true">Activo (Visible)</option>
+                        <option value="false">Inactivo (Oculto)</option>
+                    </select>
+                </div>
+
+                <div class="modal-actions">
+                    <button type="button" class="btn btn-secondary" onclick="closeCategoriaModal()">Cancelar</button>
+                    <button type="submit" class="btn btn-primary">
+                        <i class="fas fa-save"></i>
+                        Guardar
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div id="loadingOverlay" class="loading-overlay" style="display: none;">
+        <div class="spinner"></div>
+        <p>Cargando...</p>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="supabase-config.js"></script>
+    <script src="admin-script.js"></script>
+</body>
+
+</html>

@@ -49,10 +49,10 @@
         <nav class="navbar">
             <div class="container nav-container">
                 <div class="logo-container">
-                    <img src="img/logo.jpeg" alt="GRUPO FERRENORTE RO&MY Logo" class="logo">
+                    <img src="img/logo.jpeg" alt="GRUPO FERRENORTE RO&MY Logo" class="logo" id="siteLogo">
                     <div class="brand-name">
-                        <span class="brand-main">GRUPO FERRENORTE</span>
-                        <span class="brand-sub">RO&MY E.I.R.L</span>
+                        <span class="brand-main" id="siteBrandMain">GRUPO FERRENORTE</span>
+                        <span class="brand-sub" id="siteBrandSub">RO&MY E.I.R.L</span>
                     </div>
                 </div>
 
@@ -63,12 +63,35 @@
                 </button>
 
                 <ul class="nav-menu" id="navMenu">
+                    <li class="mobile-search-li">
+                        <div class="search-wrapper mobile-search">
+                            <input type="text" class="searchInput" placeholder="Buscar...">
+                            <button class="searchBtn"><i class="fas fa-search"></i></button>
+                            <div class="search-results-dropdown mobile" id="searchResultsDropdownMobile"></div>
+                        </div>
+                    </li>
                     <li><a href="#hero" class="nav-link active">Inicio</a></li>
                     <li><a href="#productos" class="nav-link">Productos</a></li>
                     <li><a href="#categorias" class="nav-link">Categorías</a></li>
                     <li><a href="#sobre-nosotros" class="nav-link">Nosotros</a></li>
                     <li><a href="#contacto" class="nav-link">Contacto</a></li>
                 </ul>
+
+                <div class="nav-actions">
+                    <div class="search-wrapper desktop-search">
+                        <input type="text" class="searchInput" placeholder="Buscar productos...">
+                        <button class="searchBtn"><i class="fas fa-search"></i></button>
+                        <div class="search-results-dropdown" id="searchResultsDropdown"></div>
+                    </div>
+                    <button id="cartToggleBtn" class="cart-toggle-btn">
+                        <i class="fas fa-file-invoice"></i>
+                        <span class="cart-count">0</span>
+                        <span class="cart-text">Cotizar</span>
+                    </button>
+                    <a href="admin.html" class="admin-login-btn" title="Acceso Admin">
+                        <i class="fas fa-user-circle"></i>
+                    </a>
+                </div>
             </div>
         </nav>
     </header>
@@ -79,10 +102,10 @@
         <div class="container hero-content">
             <div class="hero-text">
                 <h1 class="hero-title">
-                    <span class="title-line">Soluciones Profesionales</span>
-                    <span class="title-line gradient-text">Para Tu Negocio</span>
+                    <span class="title-line" id="heroTitleLine1">Soluciones Profesionales</span>
+                    <span class="title-line gradient-text" id="heroTitleLine2">Para Tu Negocio</span>
                 </h1>
-                <p class="hero-description">
+                <p class="hero-description" id="heroDescription">
                     Expertos en productos ferreteros, muebles para implementación comercial y accesorios especializados.
                     Calidad garantizada para impulsar tu emprendimiento.
                 </p>
@@ -466,17 +489,113 @@
                 <div class="product-detail-info">
                     <h2 id="modalProductTitle" class="product-detail-title"></h2>
                     <div class="product-detail-divider"></div>
+
+                    <div class="product-price-stock"
+                        style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
+                        <h3 id="modalProductPrice"
+                            style="font-size: 24px; color: var(--primary-blue); font-weight: 800;"></h3>
+                        <span id="modalProductStock" class="badge badge-info"
+                            style="font-size: 14px; padding: 6px 12px; border-radius: 20px; background: #e0f2fe; color: #0369a1;"></span>
+                    </div>
+
                     <p id="modalProductDescription" class="product-detail-description"></p>
 
-                    <div class="product-detail-actions">
-                        <a href="#" id="modalWhatsAppBtn" class="whatsapp-btn-large" target="_blank">
-                            <i class="fab fa-whatsapp"></i> Consultar Disponibilidad
+                    <!-- Opciones de Producto (Colores/Medidas/etc) -->
+                    <div id="modalProductVariants" style="margin-bottom: 25px; display: none;">
+                        <h4 style="font-size: 14px; color: var(--gray-700); margin-bottom: 12px; font-weight: 700;">
+                            Seleccionar Opción:</h4>
+                        <div id="variantsSelectorContainer" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                            <!-- Injected by JS -->
+                        </div>
+                    </div>
+
+                    <div class="product-price-stock"
+                        style="margin-bottom: 25px; display: flex; align-items: baseline; gap: 15px;">
+                        <span id="modalProductPrice"
+                            style="font-size: 28px; font-weight: 800; color: var(--primary-blue);"></span>
+                        <span id="modalProductStock" class="badge"></span>
+                    </div>
+
+                    <div style="margin-bottom: 25px;">
+                        <label
+                            style="display: block; font-weight: 700; margin-bottom: 10px; font-size: 14px; color: var(--gray-700);">Seleccionar
+                            Cantidad:</label>
+                        <div class="qty-control">
+                            <button type="button" onclick="changeModalQty(-1)">-</button>
+                            <input type="number" id="modalQty" value="1" min="1" readonly>
+                            <button type="button" onclick="changeModalQty(1)">+</button>
+                        </div>
+                    </div>
+
+                    <div id="modalProductSpecsContainer" style="margin-bottom: 30px; display: none;">
+                        <h4 style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px; font-weight: 600;">
+                            Documentación Adicional:</h4>
+                        <a id="modalProductSpecsLink" href="#" target="_blank" class="btn-specs-download">
+                            <i class="fas fa-file-pdf"></i> Descargar Ficha Técnica
+                        </a>
+                    </div>
+
+                    <div class="product-detail-actions" style="display: flex; flex-direction: column; gap: 12px;">
+                        <button id="addToQuoteBtn" class="btn btn-primary"
+                            style="padding: 18px; width: 100%; border-radius: 12px; font-size: 17px; font-weight: 800;">
+                            <i class="fas fa-plus-circle"></i> AÑADIR A MI LISTA
+                        </button>
+                        <a href="#" id="modalWhatsAppBtn" class="whatsapp-btn-large" target="_blank"
+                            style="width: 100%; box-sizing: border-box;">
+                            <i class="fab fa-whatsapp"></i> Chat Directo con un Asesor
                         </a>
                     </div>
                 </div>
             </div>
         </div>
     </div>
+
+
+    <!-- Side Quote Panel Móvil/Escritorio Final -->
+    <div id="quoteSidebar" class="quote-sidebar">
+        <div class="quote-sidebar-header">
+            <h3>Mi Cotización</h3>
+            <button id="closeQuoteSidebar" class="close-btn"><i class="fas fa-times"></i></button>
+        </div>
+        <div id="quoteItemsList" class="quote-items-list">
+            <div class="empty-cart-msg">
+                <i class="fas fa-clipboard-list"></i>
+                <p>Tu lista está vacía</p>
+            </div>
+        </div>
+        <div class="quote-sidebar-footer">
+            <div class="location-box"
+                style="margin-bottom: 20px; background: #f9fafb; padding: 15px; border-radius: 12px; border: 1px solid var(--gray-200);">
+                <label
+                    style="display: block; font-size: 13px; font-weight: 700; color: var(--gray-700); margin-bottom: 8px;">Dirección
+                    de Entrega:</label>
+                <input type="text" id="manualAddress" placeholder="Ej: Av. Principal 123, Distrito..."
+                    style="width: 100%; padding: 10px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; outline: none;">
+
+                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
+                    <div style="flex: 1; height: 1px; background: var(--gray-200);"></div>
+                    <span style="font-size: 10px; color: var(--gray-400); font-weight: 700;">Ó USA TU GPS</span>
+                    <div style="flex: 1; height: 1px; background: var(--gray-200);"></div>
+                </div>
+
+                <button id="getLocationBtn" class="btn-location-small" style="background: white;">
+                    <i class="fas fa-satellite-dish"></i> Enviar mi ubicación actual
+                </button>
+                <div id="locationStatus"
+                    style="font-size: 11px; margin-top: 5px; color: var(--gray-500); text-align: center;"></div>
+                <input type="hidden" id="userCoords">
+            </div>
+            <div class="quote-summary"
+                style="display: flex; justify-content: space-between; padding: 15px 0; border-top: 1px solid var(--gray-100);">
+                <span style="font-weight: 700;">Total de Productos:</span>
+                <span id="quoteTotalCount" style="font-weight: 800; color: var(--primary-blue);">0</span>
+            </div>
+            <button id="sendQuoteBtn" class="send-quote-btn" style="width: 100%; border-radius: 12px; height: 55px;">
+                <i class="fab fa-whatsapp"></i> Generar Cotización Profesional
+            </button>
+        </div>
+    </div>
+    <div id="sidebarBackdrop" class="sidebar-backdrop"></div>
 
     <!-- Supabase Client Library -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>

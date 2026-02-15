@@ -1,0 +1,20 @@
+# Archivos de sistema
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Carpetas de IDEs
+.vscode/
+.idea/
+*.sublime-*
+
+# Archivos temporales
+*.tmp
+*.temp
+*.log
+*.swp
+*~
+
+# No ignorar las credenciales de Supabase
+# (son seguras de exponer porque usamos RLS)
+# !supabase-config.js

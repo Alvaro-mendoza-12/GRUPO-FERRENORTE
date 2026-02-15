@@ -5,6 +5,26 @@
 // Variables globales para almacenar los datos
 let productos = [];
 let categorias = [];
+// Carrito y Selección
+let socialLinks = {
+    whatsapp: 'https://wa.me/51904068052',
+    facebook: 'https://facebook.com/grupoferrenorte',
+    tiktok: 'https://tiktok.com/@grupoferrenorte',
+    instagram: 'https://instagram.com/grupoferrenorte'
+};
+
+let quoteCart = [];
+try {
+    const saved = localStorage.getItem('ferrenorte_quote');
+    if (saved) {
+        quoteCart = JSON.parse(saved);
+        quoteCart = quoteCart.map(item => ({ ...item, qty: item.qty || 1 }));
+    }
+} catch (e) {
+    console.error("Error parsing cart:", e);
+    quoteCart = [];
+}
+let selectedVariant = null; // Variante seleccionada en el modal actual
 
 const REPRESENTATIVE_PRODUCTS = {
     1: [ // Productos Ferreteros
@@ -45,7 +65,10 @@ async function cargarProductos() {
             imagen: p.imagen_url,
             badge: p.badge || '',
             badgeColor: p.badge_color || 'default',
-            categoria_id: p.categoria_id // Vinculación con categoría
+            categoria_id: p.categoria_id, // Vinculación con categoría
+            precio: p.precio || 0,
+            stock: p.stock || 0,
+            ficha_tecnica: p.ficha_tecnica || ''
         }));
 
         incorporarProductosRepresentativos(); // Asegurar que los productos fijos estén presentes
@@ -141,25 +164,38 @@ function incorporarProductosRepresentativos() {
 // RENDERIZADO DE CONTENIDO
 // ===========================
 
-function renderProductos() {
+function renderProductos(filtered = null) {
     const grid = document.getElementById('productsGrid');
     if (!grid) return;
 
-    if (productos.length === 0) {
-        grid.innerHTML = '<p style="text-align: center; color: var(--gray-600);">No hay productos disponibles en este momento.</p>';
+    const dataToShow = filtered || productos;
+
+    if (dataToShow.length === 0) {
+        grid.innerHTML = '<p style="text-align: center; color: var(--gray-600); grid-column: 1/-1; padding: 40px;">No se encontraron productos que coincidan con tu búsqueda.</p>';
         return;
     }
 
-    grid.innerHTML = productos.map(producto => `
+    grid.innerHTML = dataToShow.map(producto => `
         <div class="product-card" onclick="verDetalleProducto(${producto.id})" style="cursor: pointer;">
             <div class="product-image">
                 <img src="${producto.imagen}" alt="${producto.titulo}" loading="lazy">
                 ${producto.badge ? `<div class="product-badge ${producto.badgeColor === 'new' ? 'new' : ''}">${producto.badge}</div>` : ''}
             </div>
-            <div class="product-content">
-                <h3 class="product-title">${producto.titulo}</h3>
-                <p class="product-description">${producto.descripcion}</p>
-                <button class="product-link" onclick="verDetalleProducto(${producto.id})">Consultar <i class="fas fa-arrow-right"></i></button>
+            <div class="product-content" style="padding: 20px;">
+                <h3 class="product-title" style="font-size: 15px; min-height: 40px; margin-bottom: 12px;">${producto.titulo}</h3>
+                
+                <div class="product-pricing" style="margin-bottom: 15px;">
+                    ${producto.precio > 0
+            ? `<div class="price-main" style="font-size: 22px; font-weight: 800; color: var(--primary-blue);">S/ ${parseFloat(producto.precio).toFixed(2)}</div>`
+            : `<div class="price-consult" style="font-size: 16px; font-weight: 700; color: var(--gray-500);">PRECIO A CONSULTAR</div>`
+        }
+                </div>
+
+                <div class="product-card-actions" style="display: flex; gap: 8px;">
+                    <button class="btn-add-pill" onclick="event.stopPropagation(); verDetalleProducto(${producto.id})" style="flex: 1; padding: 10px; border: 2px solid var(--primary-orange); color: var(--primary-orange); background: transparent; border-radius: 25px; font-weight: 800; font-size: 13px; transition: all 0.3s;">
+                        AGREGAR
+                    </button>
+                </div>
             </div>
         </div>
     `).join('');
@@ -246,8 +282,12 @@ function verDetalleCategoria(id) {
                     </div>
                     <div class="product-content">
                         <h3 class="product-title">${p.titulo}</h3>
+                        ${p.precio > 0 ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px;">S/ ${parseFloat(p.precio).toFixed(2)}</div>` : ''}
                         <p class="product-description">${p.descripcion}</p>
-                        <button class="product-link">Consultar <i class="fas fa-arrow-right"></i></button>
+                        <div class="product-card-footer" style="display: flex; gap: 10px; margin-top: 15px;">
+                            <button class="product-link" onclick="event.stopPropagation(); verDetalleProducto(${p.id})">Detalles</button>
+                            <button class="btn-quote-small" onclick="event.stopPropagation(); addToQuote(${p.id})" style="background: var(--gray-100); border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--primary-blue); font-weight: 700;"><i class="fas fa-plus"></i></button>
+                        </div>
                     </div>
                 </div>
             `).join('');
@@ -322,12 +362,133 @@ function verDetalleProducto(id) {
         badge.style.display = 'none';
     }
 
-    // WhatsApp Link
-    const msg = `Hola, estoy interesado en el producto: *${producto.titulo}*`;
+    // Price & Stock
+    const priceEl = document.getElementById('modalProductPrice');
+    if (producto.precio && producto.precio > 0) {
+        priceEl.textContent = `S/ ${parseFloat(producto.precio).toFixed(2)}`;
+        priceEl.style.display = 'block';
+    } else {
+        priceEl.textContent = 'A TRATAR';
+        priceEl.style.fontSize = '20px';
+        priceEl.style.display = 'block';
+    }
+
+    const stockEl = document.getElementById('modalProductStock');
+    if (producto.stock && producto.stock > 0) {
+        stockEl.textContent = `${producto.stock} EN STOCK`;
+        stockEl.className = 'badge badge-success';
+        stockEl.style.display = 'inline-block';
+    } else {
+        stockEl.textContent = 'COMPRA SEGURA';
+        stockEl.className = 'badge badge-info';
+        stockEl.style.display = 'inline-block';
+    }
+
+    // Ficha Técnica
+    const specsContainer = document.getElementById('modalProductSpecsContainer');
+    const specsLink = document.getElementById('modalProductSpecsLink');
+    if (producto.ficha_tecnica && producto.ficha_tecnica.trim() !== '') {
+        specsLink.href = producto.ficha_tecnica;
+        specsContainer.style.display = 'block';
+    } else {
+        specsContainer.style.display = 'none';
+    }
+
+    // WhatsApp
+    let waMsg = `Hola, estoy interesado en el producto: *${producto.titulo}*`;
+    if (producto.precio > 0) waMsg += ` (Precio: S/ ${producto.precio})`;
     const whatsappBtn = document.getElementById('modalWhatsAppBtn');
-    whatsappBtn.href = `https://wa.me/51904068052?text=${encodeURIComponent(msg)}`;
+    const waNumber = socialLinks.whatsapp.split('/').pop();
+    whatsappBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}`;
+
+    // Reset Selection
+    selectedVariant = null;
+    const variantsEl = document.getElementById('modalProductVariants');
+    variantsEl.style.display = 'none';
+
+    // Cargar Variantes desde Supabase
+    cargarYRenderizarVariantes(producto);
 
     document.getElementById('productDetailModal').classList.add('active');
+
+    // Configurar botón "Cotizar" en el modal
+    const addToQuoteBtn = document.getElementById('addToQuoteBtn');
+    if (addToQuoteBtn) {
+        addToQuoteBtn.onclick = () => {
+            const qty = parseInt(document.getElementById('modalQty').value) || 1;
+            addToQuote(producto.id, qty, selectedVariant);
+            cerrarModalProducto();
+        };
+    }
+}
+
+async function cargarYRenderizarVariantes(producto) {
+    const container = document.getElementById('variantsSelectorContainer');
+    const wrapper = document.getElementById('modalProductVariants');
+    container.innerHTML = '';
+
+    try {
+        const { data: variants, error } = await supabaseClient
+            .from('variantes')
+            .select('*')
+            .eq('producto_id', producto.id)
+            .eq('activo', true);
+
+        if (error) throw error;
+
+        if (variants && variants.length > 0) {
+            wrapper.style.display = 'block';
+            variants.forEach(v => {
+                const btn = document.createElement('button');
+                btn.className = 'variant-opt-btn';
+                btn.innerText = v.titulo;
+                btn.style = 'padding: 8px 16px; border: 2px solid var(--gray-200); border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;';
+
+                btn.onclick = () => seleccionarVariante(v, btn, producto);
+                container.appendChild(btn);
+            });
+        }
+    } catch (e) {
+        console.error('Error cargando variantes:', e);
+    }
+}
+
+function seleccionarVariante(variante, btn, productoBase) {
+    // Deseleccionar otros
+    document.querySelectorAll('.variant-opt-btn').forEach(b => {
+        b.style.borderColor = 'var(--gray-200)';
+        b.style.color = 'var(--gray-700)';
+    });
+
+    // Seleccionar este
+    btn.style.borderColor = 'var(--primary-blue)';
+    btn.style.color = 'var(--primary-blue)';
+    selectedVariant = variante;
+
+    // Actualizar Imagen si existe
+    if (variante.imagen_url) {
+        document.getElementById('modalProductImage').src = variante.imagen_url;
+    } else {
+        document.getElementById('modalProductImage').src = productoBase.imagen;
+    }
+
+    // Actualizar Precio si es > 0
+    const priceEl = document.getElementById('modalProductPrice');
+    const precioAMostrar = variante.precio > 0 ? variante.precio : productoBase.precio;
+
+    if (precioAMostrar > 0) {
+        priceEl.textContent = `S/ ${parseFloat(precioAMostrar).toFixed(2)}`;
+    } else {
+        priceEl.textContent = 'A TRATAR';
+    }
+}
+
+function changeModalQty(val) {
+    const input = document.getElementById('modalQty');
+    let current = parseInt(input.value) || 1;
+    current += val;
+    if (current < 1) current = 1;
+    input.value = current;
 }
 
 function cerrarModalProducto() {
@@ -337,17 +498,327 @@ function cerrarModalProducto() {
 // Cerrar modal al hacer click fuera
 window.onclick = function (event) {
     const modal = document.getElementById('productDetailModal');
+    const sidebar = document.getElementById('quoteSidebar');
+
     if (event.target == modal) {
         cerrarModalProducto();
     }
+
+    // Si se hace click fuera del sidebar y éste está activo, cerrarlo (opcional)
+    if (sidebar && sidebar.classList.contains('active') && !sidebar.contains(event.target) && !event.target.closest('#cartToggleBtn') && !event.target.closest('.remove-item-btn') && !event.target.closest('.btn-quote-small') && !event.target.closest('#addToQuoteBtn')) {
+        // Solo cerrar si el click no es en botones que interactúan con el carrito
+        // closeQuoteSidebar(); // Desactivado por ahora para evitar cierres accidentales
+    }
+}
+
+// ===========================
+// LÓGICA DE COTIZACIÓN (CARRITO)
+// ===========================
+
+function addToQuote(id, qty = 1, variant = null) {
+    const producto = productos.find(p => p.id == id);
+    if (!producto) return;
+
+    // Generar un ID único para la combinación producto-variante
+    const cartItemId = variant ? `${id}_${variant.id}` : `${id}`;
+
+    const existing = quoteCart.find(item => item.id == cartItemId);
+    if (existing) {
+        existing.qty += qty;
+    } else {
+        quoteCart.push({
+            id: cartItemId,
+            originalId: id,
+            titulo: producto.titulo,
+            variante: variant ? variant.titulo : null,
+            imagen: variant && variant.imagen_url ? variant.imagen_url : producto.imagen,
+            precio: variant && variant.precio > 0 ? variant.precio : producto.precio,
+            qty: qty
+        });
+    }
+
+    saveQuote();
+    renderQuoteItems();
+    updateCartCount();
+    openQuoteSidebar();
+}
+
+function changeCartQty(id, val) {
+    const item = quoteCart.find(i => i.id == id);
+    if (item) {
+        item.qty += val;
+        if (item.qty < 1) {
+            removeFromQuote(id);
+        } else {
+            saveQuote();
+            renderQuoteItems();
+            updateTotalItems();
+        }
+    }
+}
+
+function updateTotalItems() {
+    let total = 0;
+    quoteCart.forEach(item => total += item.qty);
+    document.getElementById('quoteTotalCount').textContent = total;
+}
+
+function removeFromQuote(id) {
+    quoteCart = quoteCart.filter(item => item.id != id);
+    saveQuote();
+    renderQuoteItems();
+    updateCartCount();
+}
+
+function saveQuote() {
+    localStorage.setItem('ferrenorte_quote', JSON.stringify(quoteCart));
+}
+
+function updateCartCount() {
+    const counts = document.querySelectorAll('.cart-count');
+    counts.forEach(c => c.textContent = quoteCart.length);
+}
+
+function renderQuoteItems() {
+    const list = document.getElementById('quoteItemsList');
+    if (!list) return;
+
+    if (quoteCart.length === 0) {
+        list.innerHTML = `
+            <div class="empty-cart-msg">
+                <i class="fas fa-clipboard-list"></i>
+                <p>Tu lista está vacía</p>
+            </div>
+        `;
+        document.getElementById('quoteTotalCount').textContent = "0";
+        return;
+    }
+
+    list.innerHTML = quoteCart.map(item => `
+        <div class="quote-item">
+            <img src="${item.imagen}" alt="${item.titulo}" class="quote-item-img">
+            <div class="quote-item-info">
+                <div class="quote-item-title">${item.titulo}</div>
+                ${item.variante ? `<div style="font-size: 11px; color: var(--gray-500); margin-top: -3px; margin-bottom: 5px;">Opción: ${item.variante}</div>` : ''}
+                <div class="quote-item-price">${item.precio > 0 ? 'S/ ' + parseFloat(item.precio).toFixed(2) : 'Consultar precio'}</div>
+                <div class="quote-item-controls">
+                    <div class="qty-control">
+                        <button onclick="changeCartQty('${item.id}', -1)">-</button>
+                        <input type="text" class="quote-item-qty-input" value="${item.qty}" readonly>
+                        <button onclick="changeCartQty('${item.id}', 1)">+</button>
+                    </div>
+                </div>
+            </div>
+            <button class="remove-item-btn" onclick="removeFromQuote('${item.id}')">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+    `).join('');
+
+    updateTotalItems();
+}
+
+function openQuoteSidebar() {
+    // Cerrar buscadores abiertos
+    document.querySelectorAll('.search-results-dropdown').forEach(d => d.classList.remove('active'));
+
+    const sidebar = document.getElementById('quoteSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    if (sidebar) {
+        sidebar.style.cssText = "display: flex !important; right: 0px !important; transform: translateX(0) !important; opacity: 1 !important; visibility: visible !important; background: white !important; z-index: 100000 !important; width: 400px !important; position: fixed !important;";
+        sidebar.classList.add('active');
+        console.log("✅ Sidebar activado con estilos forzados.");
+    } else {
+        alert("❌ ERROR: El elemento 'quoteSidebar' no existe en el HTML.");
+    }
+
+    if (backdrop) {
+        backdrop.style.cssText = "display: block !important; opacity: 1 !important; z-index: 99999 !important; background: rgba(0,0,0,0.8) !important; position: fixed !important; top:0; left:0; width:100%; height:100%;";
+        backdrop.classList.add('active');
+    }
+
+    renderQuoteItems();
+}
+
+function closeQuoteSidebar() {
+    const sidebar = document.getElementById('quoteSidebar');
+    const backdrop = document.getElementById('sidebarBackdrop');
+
+    if (sidebar) {
+        sidebar.classList.remove('active');
+        sidebar.style.right = ''; // Reset overrides
+        sidebar.style.transform = '';
+    }
+    if (backdrop) {
+        backdrop.classList.remove('active');
+        backdrop.style.opacity = '0';
+        backdrop.style.pointerEvents = 'none';
+    }
+}
+
+// Búsqueda de productos
+function initSearch() {
+    const inputs = document.querySelectorAll('.searchInput');
+    const dropdowns = [
+        document.getElementById('searchResultsDropdown'),
+        document.getElementById('searchResultsDropdownMobile')
+    ];
+
+    inputs.forEach(input => {
+        input.addEventListener('input', (e) => {
+            const term = e.target.value.toLowerCase().trim();
+
+            // Sincronizar el otro input
+            inputs.forEach(other => { if (other !== input) other.value = e.target.value; });
+
+            if (term === "") {
+                dropdowns.forEach(d => { if (d) d.classList.remove('active'); });
+                return;
+            }
+
+            const filtered = productos.filter(p =>
+                p.titulo.toLowerCase().includes(term) ||
+                p.descripcion.toLowerCase().includes(term)
+            ).slice(0, 8); // Máximo 8 resultados en el dropdown
+
+            renderSearchDropdown(filtered);
+        });
+
+        // Ocultar al perder foco (con delay para permitir clicks)
+        input.addEventListener('blur', () => {
+            setTimeout(() => {
+                dropdowns.forEach(d => { if (d) d.classList.remove('active'); });
+            }, 200);
+        });
+    });
+}
+
+function renderSearchDropdown(results) {
+    const dropdowns = [
+        document.getElementById('searchResultsDropdown'),
+        document.getElementById('searchResultsDropdownMobile')
+    ];
+
+    dropdowns.forEach(dropdown => {
+        if (!dropdown) return;
+
+        if (results.length === 0) {
+            dropdown.innerHTML = '<div style="padding: 15px; text-align: center; color: var(--gray-400); font-size: 13px;">No se encontraron productos</div>';
+        } else {
+            dropdown.innerHTML = results.map(p => `
+                <div class="search-result-item" onclick="verDetalleProducto(${p.id})">
+                    <img src="${p.imagen}" alt="${p.titulo}">
+                    <div class="search-result-info">
+                        <div class="search-result-title">${p.title || p.titulo}</div>
+                        <div class="search-result-price">${p.precio > 0 ? 'S/ ' + parseFloat(p.precio).toFixed(2) : 'A Tratar'}</div>
+                    </div>
+                </div>
+            `).join('');
+        }
+        dropdown.classList.add('active');
+    });
+}
+
+// Georreferenciación para envío
+function getUserLocation() {
+    const status = document.getElementById('locationStatus');
+    const btn = document.getElementById('getLocationBtn');
+
+    if (!navigator.geolocation) {
+        status.textContent = "Geolocalización no soportada por tu navegador";
+        return;
+    }
+
+    status.textContent = "Obteniendo ubicación...";
+    btn.disabled = true;
+
+    navigator.geolocation.getCurrentPosition(
+        (position) => {
+            const { latitude, longitude } = position.coords;
+            const googleMapsUrl = `https://www.google.com/maps?q=${latitude},${longitude}`;
+            document.getElementById('userCoords').value = googleMapsUrl;
+            status.textContent = "✅ Ubicación obtenida correctamente";
+            btn.classList.add('active');
+            btn.innerHTML = '<i class="fas fa-check"></i> Ubicación Lista';
+        },
+        () => {
+            status.textContent = "❌ Error al obtener ubicación";
+            btn.disabled = false;
+        }
+    );
+}
+
+// Generar WhatsApp de Cotización Profesional
+function generateWhatsAppQuote() {
+    if (quoteCart.length === 0) {
+        alert("Agrega productos a tu lista antes de generar la cotización.");
+        return;
+    }
+
+    let message = `📦 *COTIZACIÓN PROFESIONAL - ${document.title}*\n\n`;
+    message += "Hola, un gusto saludarles. 👋\nHe seleccionado los siguientes productos en su catálogo web y deseo solicitar una cotización formal:\n\n";
+
+    quoteCart.forEach((item, index) => {
+        let titleLine = `🔹 *${item.titulo.toUpperCase()}*`;
+        if (item.variante) titleLine += ` (${item.variante})`;
+        message += `${titleLine}\n   Cantidad: ${item.qty} ${item.qty > 1 ? 'unidades' : 'unidad'}\n`;
+    });
+
+    const manualAddress = document.getElementById('manualAddress').value.trim();
+    const locationUrl = document.getElementById('userCoords').value;
+
+    if (manualAddress || locationUrl) {
+        message += `\n📍 *LOGÍSTICA Y ENTREGA:* \n`;
+        if (manualAddress) message += `   - Dirección: ${manualAddress}\n`;
+        if (locationUrl) message += `   - Ubicación Mapa (GPS): ${locationUrl}\n`;
+    }
+
+    message += "\n*Quedo a la espera de sus precios y formas de pago. ¡Gracias!*";
+
+    const waNumber = socialLinks.whatsapp.split('/').pop();
+    const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
+    window.open(url, '_blank');
+}
+
+// Configurar Event Listeners adicionales
+function initCartEvents() {
+    // Escuchar en todos los posibles botones con la clase o el ID
+    const cartButtons = document.querySelectorAll('#cartToggleBtn, .cart-toggle-btn');
+    cartButtons.forEach(btn => {
+        btn.onclick = (e) => {
+            console.log("Click en Cotizar - Fail-safe ON");
+            e.preventDefault();
+            e.stopPropagation();
+            openQuoteSidebar();
+        };
+    });
+
+    const closeButtons = document.querySelectorAll('#closeQuoteSidebar, .close-btn');
+    closeButtons.forEach(btn => {
+        btn.onclick = (e) => {
+            e.preventDefault();
+            closeQuoteSidebar();
+        };
+    });
+
+    const backdrop = document.getElementById('sidebarBackdrop');
+    if (backdrop) {
+        backdrop.onclick = (e) => {
+            e.preventDefault();
+            closeQuoteSidebar();
+        };
+    }
+
+    const sendBtn = document.getElementById('sendQuoteBtn');
+    if (sendBtn) sendBtn.onclick = generateWhatsAppQuote;
+
+    const locBtn = document.getElementById('getLocationBtn');
+    if (locBtn) locBtn.onclick = getUserLocation;
 }
 
 // Inicializar renderizado
-document.addEventListener('DOMContentLoaded', () => {
-    // Cargar datos desde Supabase
-    cargarProductos();
-    cargarCategorias();
-});
+// Redundant listener removed - Consolidated at the end of the file
 
 // ===========================
 // MOBILE MENU TOGGLE
@@ -636,13 +1107,7 @@ floatingCards.forEach((card, index) => {
 // ===========================
 // SOCIAL LINKS CONFIGURATION
 // ===========================
-// Update these with actual social media links
-const socialLinks = {
-    whatsapp: 'https://wa.me/51904068052', // Replace with actual number
-    facebook: 'https://facebook.com/grupoferrenorte',
-    tiktok: 'https://tiktok.com/@grupoferrenorte',
-    instagram: 'https://instagram.com/grupoferrenorte'
-};
+// Social links moved to the top for resilience
 
 // Apply links to all social icons
 document.querySelectorAll('.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float').forEach(link => {
@@ -691,17 +1156,89 @@ window.addEventListener('scroll', debounce(() => {
 // ===========================
 // INITIALIZATION
 // ===========================
+// ===========================
+// SITE CONFIGURATION
+// ===========================
+async function cargarConfiguracionSitio() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('configuracion')
+            .select('*')
+            .single();
+
+        if (error) {
+            // Si no existe tabla o fila, ignorar silenciosamente (usar valores default HTML)
+            return;
+        }
+        if (!data) return;
+
+        // 1. Logo
+        if (data.logo_url) {
+            const logo = document.getElementById('siteLogo');
+            if (logo) logo.src = data.logo_url;
+
+            // Favicon
+            const favicon = document.getElementById('favicon');
+            if (favicon) favicon.href = data.logo_url;
+        }
+
+        // 2. Textos
+        if (data.nombre_sitio) {
+            document.title = data.nombre_sitio;
+            const brandMain = document.getElementById('siteBrandMain');
+            const brandSub = document.getElementById('siteBrandSub');
+            // Simple split logic if user puts "Main Sub"
+            // For now just set brandMain if custom name
+            if (brandMain) brandMain.textContent = data.nombre_sitio;
+            if (brandSub) brandSub.textContent = ''; // Clear sub or put slogan?
+        }
+
+        if (data.descripcion_sitio) {
+            const heroDesc = document.getElementById('heroDescription');
+            if (heroDesc) heroDesc.textContent = data.descripcion_sitio;
+            // Meta description?
+            document.querySelector('meta[name="description"]')?.setAttribute('content', data.descripcion_sitio);
+        }
+
+        // 3. WhatsApp
+        if (data.contacto_whatsapp) {
+            const waNumber = data.contacto_whatsapp.replace(/\D/g, '');
+            // Update global socialLinks
+            socialLinks.whatsapp = `https://wa.me/${waNumber}`;
+
+            // Update all buttons
+            document.querySelectorAll('.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float').forEach(link => {
+                link.href = socialLinks.whatsapp;
+            });
+        }
+
+    } catch (e) { console.error('Error loading config:', e); }
+}
+
 document.addEventListener('DOMContentLoaded', async () => {
+    console.log("DOM Loaded - Starting initialization...");
     document.body.classList.add('loaded');
 
-    await Promise.all([
-        cargarProductos(),
-        cargarCategorias()
-    ]);
+    // Inicialización de UI inmediata (no esperar a la base de datos)
+    try { initCartEvents(); } catch (e) { console.error("Error initCartEvents:", e); }
+    try { initSearch(); } catch (e) { console.error("Error initSearch:", e); }
+    try { renderQuoteItems(); } catch (e) { console.error("Error renderQuoteItems:", e); }
+    try { updateCartCount(); } catch (e) { console.error("Error updateCartCount:", e); }
+
+    // Cargar datos asíncronos
+    try {
+        await cargarConfiguracionSitio();
+        await Promise.all([
+            cargarProductos(),
+            cargarCategorias()
+        ]);
+    } catch (e) {
+        console.error("Error loading data:", e);
+    }
 
     setTimeout(() => {
-        initializeAnimations();
-        initializeLazyLoading();
-        setActiveNav();
+        try { initializeAnimations(); } catch (e) { }
+        try { initializeLazyLoading(); } catch (e) { }
+        try { setActiveNav(); } catch (e) { }
     }, 100);
 });
