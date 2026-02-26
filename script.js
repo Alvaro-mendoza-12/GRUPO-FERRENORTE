@@ -5,13 +5,34 @@
 // Variables globales para almacenar los datos
 let productos = [];
 let categorias = [];
+const DEFAULT_WHATSAPP_NUMBER = '51926093080';
 // Carrito y Selección
 let socialLinks = {
-    whatsapp: 'https://wa.me/51904068052',
+    whatsapp: `https://wa.me/${DEFAULT_WHATSAPP_NUMBER}`,
     facebook: 'https://facebook.com/grupoferrenorte',
     tiktok: 'https://tiktok.com/@grupoferrenorte',
     instagram: 'https://instagram.com/grupoferrenorte'
 };
+
+function normalizarWhatsAppNumber(rawValue) {
+    const digits = String(rawValue || '').replace(/\D/g, '');
+    if (!digits) return DEFAULT_WHATSAPP_NUMBER;
+    if (digits.length === 9) return `51${digits}`;
+    return digits;
+}
+
+function getWhatsAppNumber() {
+    const fromLink = socialLinks.whatsapp.replace(/\D/g, '');
+    return normalizarWhatsAppNumber(fromLink);
+}
+
+function syncBodyScrollLock() {
+    const navOpen = document.getElementById('navMenu')?.classList.contains('active');
+    const sidebarOpen = document.getElementById('quoteSidebar')?.classList.contains('active');
+    document.body.classList.toggle('menu-open', Boolean(navOpen || sidebarOpen));
+    const navBackdrop = document.getElementById('mobileNavBackdrop');
+    if (navBackdrop) navBackdrop.classList.toggle('active', Boolean(navOpen));
+}
 
 let quoteCart = [];
 try {
@@ -398,7 +419,7 @@ function verDetalleProducto(id) {
     let waMsg = `Hola, estoy interesado en el producto: *${producto.titulo}*`;
     if (producto.precio > 0) waMsg += ` (Precio: S/ ${producto.precio})`;
     const whatsappBtn = document.getElementById('modalWhatsAppBtn');
-    const waNumber = socialLinks.whatsapp.split('/').pop();
+    const waNumber = getWhatsAppNumber();
     whatsappBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}`;
 
     // Reset Selection
@@ -625,18 +646,10 @@ function openQuoteSidebar() {
     const sidebar = document.getElementById('quoteSidebar');
     const backdrop = document.getElementById('sidebarBackdrop');
 
-    if (sidebar) {
-        sidebar.style.cssText = "display: flex !important; right: 0px !important; transform: translateX(0) !important; opacity: 1 !important; visibility: visible !important; background: white !important; z-index: 100000 !important; width: 400px !important; position: fixed !important;";
-        sidebar.classList.add('active');
-        console.log("✅ Sidebar activado con estilos forzados.");
-    } else {
-        alert("❌ ERROR: El elemento 'quoteSidebar' no existe en el HTML.");
-    }
-
-    if (backdrop) {
-        backdrop.style.cssText = "display: block !important; opacity: 1 !important; z-index: 99999 !important; background: rgba(0,0,0,0.8) !important; position: fixed !important; top:0; left:0; width:100%; height:100%;";
-        backdrop.classList.add('active');
-    }
+    if (!sidebar) return;
+    sidebar.classList.add('active');
+    if (backdrop) backdrop.classList.add('active');
+    syncBodyScrollLock();
 
     renderQuoteItems();
 }
@@ -647,14 +660,11 @@ function closeQuoteSidebar() {
 
     if (sidebar) {
         sidebar.classList.remove('active');
-        sidebar.style.right = ''; // Reset overrides
-        sidebar.style.transform = '';
     }
     if (backdrop) {
         backdrop.classList.remove('active');
-        backdrop.style.opacity = '0';
-        backdrop.style.pointerEvents = 'none';
     }
+    syncBodyScrollLock();
 }
 
 // Búsqueda de productos
@@ -776,7 +786,7 @@ function generateWhatsAppQuote() {
 
     message += "\n*Quedo a la espera de sus precios y formas de pago. ¡Gracias!*";
 
-    const waNumber = socialLinks.whatsapp.split('/').pop();
+    const waNumber = getWhatsAppNumber();
     const url = `https://wa.me/${waNumber}?text=${encodeURIComponent(message)}`;
     window.open(url, '_blank');
 }
@@ -825,11 +835,25 @@ function initCartEvents() {
 // ===========================
 const mobileMenuToggle = document.getElementById('mobileMenuToggle');
 const navMenu = document.getElementById('navMenu');
+const mobileNavBackdrop = document.getElementById('mobileNavBackdrop');
 
 if (mobileMenuToggle) {
     mobileMenuToggle.addEventListener('click', () => {
         navMenu.classList.toggle('active');
         mobileMenuToggle.classList.toggle('active');
+        const isOpen = navMenu.classList.contains('active');
+        mobileMenuToggle.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+        syncBodyScrollLock();
+    });
+}
+
+if (mobileNavBackdrop) {
+    mobileNavBackdrop.addEventListener('click', () => {
+        if (!navMenu || !mobileMenuToggle) return;
+        navMenu.classList.remove('active');
+        mobileMenuToggle.classList.remove('active');
+        mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        syncBodyScrollLock();
     });
 }
 
@@ -841,7 +865,11 @@ navLinks.forEach(link => {
         const navMenu = document.getElementById('navMenu');
         const mobileMenuToggle = document.getElementById('mobileMenuToggle');
         if (navMenu) navMenu.classList.remove('active');
-        if (mobileMenuToggle) mobileMenuToggle.classList.remove('active');
+        if (mobileMenuToggle) {
+            mobileMenuToggle.classList.remove('active');
+            mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        }
+        syncBodyScrollLock();
     });
 });
 
@@ -988,7 +1016,7 @@ if (contactForm) {
         const encodedMessage = encodeURIComponent(whatsappMessage);
 
         // Replace with actual WhatsApp number (format: country code + number, no spaces or symbols)
-        const whatsappNumber = '51904068052'; // Example: Peru number
+        const whatsappNumber = getWhatsAppNumber();
 
         // Open WhatsApp
         window.open(`https://wa.me/${whatsappNumber}?text=${encodedMessage}`, '_blank');
@@ -1087,6 +1115,8 @@ document.addEventListener('click', (e) => {
         navMenu.classList.contains('active')) {
         navMenu.classList.remove('active');
         mobileMenuToggle.classList.remove('active');
+        mobileMenuToggle.setAttribute('aria-expanded', 'false');
+        syncBodyScrollLock();
     }
 });
 
@@ -1096,6 +1126,7 @@ document.addEventListener('click', (e) => {
 const floatingCards = document.querySelectorAll('.floating-card');
 
 floatingCards.forEach((card, index) => {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
     setInterval(() => {
         const randomX = (Math.random() - 0.5) * 20;
         const randomY = (Math.random() - 0.5) * 20;
@@ -1202,7 +1233,7 @@ async function cargarConfiguracionSitio() {
 
         // 3. WhatsApp
         if (data.contacto_whatsapp) {
-            const waNumber = data.contacto_whatsapp.replace(/\D/g, '');
+            const waNumber = normalizarWhatsAppNumber(data.contacto_whatsapp);
             // Update global socialLinks
             socialLinks.whatsapp = `https://wa.me/${waNumber}`;
 

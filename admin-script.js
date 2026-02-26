@@ -83,24 +83,53 @@ function showLogin() {
 function showDashboard() {
     document.getElementById('loginScreen').style.display = 'none';
     document.getElementById('adminDashboard').style.display = 'grid';
-    document.getElementById('adminDashboard').style.display = 'grid';
     document.getElementById('adminEmail').textContent = currentUser.email;
 }
 
 // Mobile Sidebar Toggle
 const mobileMenuBtn = document.getElementById('mobileMenuBtn');
 const sidebar = document.querySelector('.sidebar');
+const sidebarBackdrop = document.getElementById('adminSidebarBackdrop');
+
+function closeMobileSidebar() {
+    if (!sidebar) return;
+    sidebar.classList.remove('active');
+    if (sidebarBackdrop) sidebarBackdrop.classList.remove('active');
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', 'false');
+    document.body.classList.remove('sidebar-open');
+}
+
+function toggleMobileSidebar() {
+    if (!sidebar) return;
+    const willOpen = !sidebar.classList.contains('active');
+    sidebar.classList.toggle('active', willOpen);
+    if (sidebarBackdrop) sidebarBackdrop.classList.toggle('active', willOpen);
+    if (mobileMenuBtn) mobileMenuBtn.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+    document.body.classList.toggle('sidebar-open', willOpen);
+}
+
 if (mobileMenuBtn) {
-    mobileMenuBtn.addEventListener('click', () => {
-        sidebar.classList.toggle('active');
-    });
+    mobileMenuBtn.addEventListener('click', toggleMobileSidebar);
 }
 // Close sidebar when clicking outside on mobile
 document.addEventListener('click', (e) => {
+    if (!mobileMenuBtn || !sidebar) return;
     if (window.innerWidth <= 968 && sidebar.classList.contains('active') &&
         !sidebar.contains(e.target) && !mobileMenuBtn.contains(e.target)) {
-        sidebar.classList.remove('active');
+        closeMobileSidebar();
     }
+});
+
+if (sidebarBackdrop) {
+    sidebarBackdrop.addEventListener('click', closeMobileSidebar);
+}
+
+window.addEventListener('resize', () => {
+    if (window.innerWidth > 968) closeMobileSidebar();
+});
+
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') closeMobileSidebar();
 });
 
 // ===========================
@@ -117,6 +146,7 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
         }
 
         switchSection(section);
+        if (window.innerWidth <= 968) closeMobileSidebar();
     });
 });
 

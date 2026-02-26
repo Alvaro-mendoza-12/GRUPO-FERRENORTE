@@ -31,7 +31,7 @@
     <meta name="twitter:image" content="img/logo.jpeg">
 
     <!-- Favicon (Icono de la pestaña) -->
-    <link rel="icon" type="image/jpeg" href="img/logo.jpeg">
+    <link id="favicon" rel="icon" type="image/jpeg" href="img/logo.jpeg">
     <link rel="apple-touch-icon" href="img/logo.jpeg">
 
     <link rel="stylesheet" href="styles.css">
@@ -56,7 +56,8 @@
                     </div>
                 </div>
 
-                <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Toggle menu">
+                <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Abrir menú de navegación"
+                    aria-expanded="false" aria-controls="navMenu">
                     <span></span>
                     <span></span>
                     <span></span>
@@ -95,6 +96,7 @@
             </div>
         </nav>
     </header>
+    <div id="mobileNavBackdrop" class="mobile-nav-backdrop"></div>
 
     <!-- Hero Section -->
     <section class="hero" id="hero">
@@ -118,6 +120,20 @@
                         <i class="fab fa-whatsapp"></i>
                         <span>Contáctanos</span>
                     </a>
+                </div>
+                <div class="hero-trust">
+                    <div class="trust-item">
+                        <i class="fas fa-award"></i>
+                        <span>Calidad Garantizada</span>
+                    </div>
+                    <div class="trust-item">
+                        <i class="fas fa-truck-fast"></i>
+                        <span>Atención Rápida</span>
+                    </div>
+                    <div class="trust-item">
+                        <i class="fas fa-headset"></i>
+                        <span>Asesoría Especializada</span>
+                    </div>
                 </div>
             </div>
             <div class="hero-visual">
@@ -208,10 +224,9 @@
     </section>
 
     <!-- Category Detail View (Initially Hidden) -->
-    <section class="category-detail-section" id="categoryDetailView" style="display: none; padding: 60px 0;">
+    <section class="category-detail-section" id="categoryDetailView">
         <div class="container">
-            <button class="btn-back" onclick="volverAlInicio()"
-                style="margin-bottom: 30px; background: none; border: none; font-size: 1.1rem; color: var(--primary-blue); cursor: pointer; display: flex; align-items: center; gap: 8px;">
+            <button class="btn-back" onclick="volverAlInicio()">
                 <i class="fas fa-arrow-left"></i> Volver a Categorías
             </button>
 
@@ -224,8 +239,7 @@
                 <!-- Productos filtrados se cargarán aquí -->
             </div>
 
-            <p id="categoryNoProducts"
-                style="text-align: center; display: none; margin-top: 40px; color: var(--gray-600); font-size: 1.1rem;">
+            <p id="categoryNoProducts" class="category-no-products">
                 No hay productos disponibles en esta categoría por el momento.
             </p>
         </div>
@@ -490,35 +504,24 @@
                     <h2 id="modalProductTitle" class="product-detail-title"></h2>
                     <div class="product-detail-divider"></div>
 
-                    <div class="product-price-stock"
-                        style="display: flex; gap: 20px; align-items: center; margin-bottom: 20px;">
-                        <h3 id="modalProductPrice"
-                            style="font-size: 24px; color: var(--primary-blue); font-weight: 800;"></h3>
-                        <span id="modalProductStock" class="badge badge-info"
-                            style="font-size: 14px; padding: 6px 12px; border-radius: 20px; background: #e0f2fe; color: #0369a1;"></span>
-                    </div>
-
                     <p id="modalProductDescription" class="product-detail-description"></p>
 
                     <!-- Opciones de Producto (Colores/Medidas/etc) -->
-                    <div id="modalProductVariants" style="margin-bottom: 25px; display: none;">
-                        <h4 style="font-size: 14px; color: var(--gray-700); margin-bottom: 12px; font-weight: 700;">
+                    <div id="modalProductVariants" class="modal-variants" style="display: none;">
+                        <h4 class="modal-subtitle">
                             Seleccionar Opción:</h4>
-                        <div id="variantsSelectorContainer" style="display: flex; flex-wrap: wrap; gap: 10px;">
+                        <div id="variantsSelectorContainer" class="variants-selector-container">
                             <!-- Injected by JS -->
                         </div>
                     </div>
 
-                    <div class="product-price-stock"
-                        style="margin-bottom: 25px; display: flex; align-items: baseline; gap: 15px;">
-                        <span id="modalProductPrice"
-                            style="font-size: 28px; font-weight: 800; color: var(--primary-blue);"></span>
+                    <div class="product-price-stock modal-price-stock">
+                        <span id="modalProductPrice" class="modal-product-price"></span>
                         <span id="modalProductStock" class="badge"></span>
                     </div>
 
-                    <div style="margin-bottom: 25px;">
-                        <label
-                            style="display: block; font-weight: 700; margin-bottom: 10px; font-size: 14px; color: var(--gray-700);">Seleccionar
+                    <div class="modal-qty-block">
+                        <label class="modal-subtitle">Seleccionar
                             Cantidad:</label>
                         <div class="qty-control">
                             <button type="button" onclick="changeModalQty(-1)">-</button>
@@ -527,21 +530,19 @@
                         </div>
                     </div>
 
-                    <div id="modalProductSpecsContainer" style="margin-bottom: 30px; display: none;">
-                        <h4 style="font-size: 14px; color: var(--gray-500); margin-bottom: 12px; font-weight: 600;">
+                    <div id="modalProductSpecsContainer" class="modal-specs-container" style="display: none;">
+                        <h4 class="modal-specs-title">
                             Documentación Adicional:</h4>
                         <a id="modalProductSpecsLink" href="#" target="_blank" class="btn-specs-download">
                             <i class="fas fa-file-pdf"></i> Descargar Ficha Técnica
                         </a>
                     </div>
 
-                    <div class="product-detail-actions" style="display: flex; flex-direction: column; gap: 12px;">
-                        <button id="addToQuoteBtn" class="btn btn-primary"
-                            style="padding: 18px; width: 100%; border-radius: 12px; font-size: 17px; font-weight: 800;">
+                    <div class="product-detail-actions modal-detail-actions">
+                        <button id="addToQuoteBtn" class="btn btn-primary modal-add-quote-btn">
                             <i class="fas fa-plus-circle"></i> AÑADIR A MI LISTA
                         </button>
-                        <a href="#" id="modalWhatsAppBtn" class="whatsapp-btn-large" target="_blank"
-                            style="width: 100%; box-sizing: border-box;">
+                        <a href="#" id="modalWhatsAppBtn" class="whatsapp-btn-large modal-whatsapp-btn" target="_blank">
                             <i class="fab fa-whatsapp"></i> Chat Directo con un Asesor
                         </a>
                     </div>
@@ -564,33 +565,29 @@
             </div>
         </div>
         <div class="quote-sidebar-footer">
-            <div class="location-box"
-                style="margin-bottom: 20px; background: #f9fafb; padding: 15px; border-radius: 12px; border: 1px solid var(--gray-200);">
-                <label
-                    style="display: block; font-size: 13px; font-weight: 700; color: var(--gray-700); margin-bottom: 8px;">Dirección
+            <div class="location-box">
+                <label class="location-label">Dirección
                     de Entrega:</label>
-                <input type="text" id="manualAddress" placeholder="Ej: Av. Principal 123, Distrito..."
-                    style="width: 100%; padding: 10px; border: 1px solid var(--gray-300); border-radius: 8px; font-size: 13px; margin-bottom: 12px; box-sizing: border-box; outline: none;">
+                <input type="text" id="manualAddress" class="manual-address-input"
+                    placeholder="Ej: Av. Principal 123, Distrito...">
 
-                <div style="display: flex; align-items: center; gap: 10px; margin-bottom: 12px;">
-                    <div style="flex: 1; height: 1px; background: var(--gray-200);"></div>
-                    <span style="font-size: 10px; color: var(--gray-400); font-weight: 700;">Ó USA TU GPS</span>
-                    <div style="flex: 1; height: 1px; background: var(--gray-200);"></div>
+                <div class="location-divider">
+                    <div class="location-divider-line"></div>
+                    <span class="location-divider-text">Ó USA TU GPS</span>
+                    <div class="location-divider-line"></div>
                 </div>
 
-                <button id="getLocationBtn" class="btn-location-small" style="background: white;">
+                <button id="getLocationBtn" class="btn-location-small">
                     <i class="fas fa-satellite-dish"></i> Enviar mi ubicación actual
                 </button>
-                <div id="locationStatus"
-                    style="font-size: 11px; margin-top: 5px; color: var(--gray-500); text-align: center;"></div>
+                <div id="locationStatus" class="location-status"></div>
                 <input type="hidden" id="userCoords">
             </div>
-            <div class="quote-summary"
-                style="display: flex; justify-content: space-between; padding: 15px 0; border-top: 1px solid var(--gray-100);">
-                <span style="font-weight: 700;">Total de Productos:</span>
-                <span id="quoteTotalCount" style="font-weight: 800; color: var(--primary-blue);">0</span>
+            <div class="quote-summary quote-summary-custom">
+                <span class="quote-summary-label">Total de Productos:</span>
+                <span id="quoteTotalCount" class="quote-summary-count">0</span>
             </div>
-            <button id="sendQuoteBtn" class="send-quote-btn" style="width: 100%; border-radius: 12px; height: 55px;">
+            <button id="sendQuoteBtn" class="send-quote-btn send-quote-btn-custom">
                 <i class="fab fa-whatsapp"></i> Generar Cotización Profesional
             </button>
         </div>

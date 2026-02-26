@@ -50,7 +50,7 @@
     <!-- Admin Dashboard -->
     <div id="adminDashboard" class="admin-dashboard" style="display: none;">
         <!-- Sidebar -->
-        <aside class="sidebar">
+        <aside id="adminSidebar" class="sidebar">
             <div class="sidebar-header">
                 <img src="img/logo.jpeg" alt="Logo" class="sidebar-logo">
                 <h2>GRUPO FERRENORTE</h2>
@@ -69,8 +69,7 @@
                     <i class="fas fa-sign-out-alt"></i>
                     <span>Cerrar Sesión</span>
                 </a>
-                <a href="#" data-section="configuracion" class="nav-item config-btn"
-                    style="margin-top: auto; border-top: 1px solid rgba(255, 255, 255, 0.2); padding-top: 16px;">
+                <a href="#" data-section="configuracion" class="nav-item config-btn">
                     <i class="fas fa-cog"></i>
                     <span>Configuración</span>
                 </a>
@@ -81,11 +80,11 @@
         <main class="main-content">
             <!-- Header -->
             <header class="content-header">
-                <button id="mobileMenuBtn" class="mobile-menu-btn"
-                    style="display: none; background: none; border: none; font-size: 24px; color: var(--gray-800); cursor: pointer; margin-right: 16px;">
+                <button id="mobileMenuBtn" class="mobile-menu-btn" aria-label="Abrir menú lateral"
+                    aria-expanded="false" aria-controls="adminSidebar">
                     <i class="fas fa-bars"></i>
                 </button>
-                <div class="header-title-wrapper" style="flex-grow: 1;">
+                <div class="header-title-wrapper">
                     <h1 id="sectionTitle">Productos</h1>
                 </div>
                 <button id="addNewBtn" class="btn btn-primary">
@@ -140,13 +139,11 @@
                     </table>
                 </div>
             </section>
-            </section>
 
             <!-- Configuración Section -->
             <section id="configuracionSection" class="content-section">
-                <div class="config-container"
-                    style="background: white; padding: 32px; border-radius: 12px; box-shadow: var(--shadow-md);">
-                    <h2 class="section-subtitle" style="margin-bottom: 24px;">Configuración General del Sitio</h2>
+                <div class="config-container">
+                    <h2 class="section-subtitle">Configuración General del Sitio</h2>
                     <form id="configForm">
                         <input type="hidden" id="configId">
 
@@ -164,18 +161,18 @@
 
                         <div class="form-group">
                             <label for="configWhatsapp">Número de WhatsApp (Contacto)</label>
-                            <input type="text" id="configWhatsapp" placeholder="Ej: 51904068052 (sin símbolos)">
+                            <input type="text" id="configWhatsapp" placeholder="Ej: 51926093080 (sin símbolos)">
                             <small>Solo números, incluir código de país (ej: 51).</small>
                         </div>
 
                         <div class="form-group">
                             <label for="configLogo">Logo del Sitio</label>
                             <input type="file" id="configLogo" accept="image/*" class="file-input">
-                            <div id="configLogoPreview" class="image-preview" style="margin-top: 10px;"></div>
+                            <div id="configLogoPreview" class="image-preview config-logo-preview"></div>
                             <input type="hidden" id="configLogoUrl">
                         </div>
 
-                        <button type="submit" class="btn btn-primary" style="margin-top: 24px;">
+                        <button type="submit" class="btn btn-primary config-submit-btn">
                             <i class="fas fa-save"></i> Guardar Configuración
                         </button>
                     </form>
@@ -183,6 +180,7 @@
             </section>
         </main>
     </div>
+    <div id="adminSidebarBackdrop" class="admin-sidebar-backdrop"></div>
 
     <!-- Modal para Producto -->
     <div id="productoModal" class="modal">
@@ -269,7 +267,7 @@
                 <div class="form-group">
                     <label for="productoFichaFile">Subir Ficha Técnica (PDF/Word)</label>
                     <input type="file" id="productoFichaFile" accept=".pdf,.doc,.docx" class="file-input">
-                    <div id="fichaFileStatus" style="font-size: 12px; margin-top: 5px; color: var(--gray-500);"></div>
+                    <div id="fichaFileStatus" class="ficha-file-status"></div>
                     <small>Este archivo se podrá descargar desde la web.</small>
                 </div>
 
@@ -281,23 +279,20 @@
                 </div>
 
                 <!-- Sección de Variantes (Colores/Medidas) -->
-                <div class="variants-admin-box"
-                    style="margin: 25px 0; padding: 20px; background: #f8fafc; border-radius: 12px; border: 1px solid var(--gray-200);">
-                    <div
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
-                        <h3 style="font-size: 15px; font-weight: 800; color: var(--primary-blue); margin: 0;">
+                <div class="variants-admin-box">
+                    <div class="variants-admin-header">
+                        <h3 class="variants-admin-title">
                             <i class="fas fa-layer-group"></i> VARIANTES DEL PRODUCTO
                         </h3>
-                        <button type="button" class="btn btn-secondary btn-sm" onclick="addVariantRow()"
-                            style="padding: 6px 12px; font-size: 13px; background: var(--white);">
+                        <button type="button" class="btn btn-secondary btn-sm variants-add-btn" onclick="addVariantRow()">
                             <i class="fas fa-plus"></i> Añadir Opción
                         </button>
                     </div>
 
-                    <div id="variantsContainer" style="display: flex; flex-direction: column; gap: 12px;">
+                    <div id="variantsContainer" class="variants-container">
                         <!-- JS injected rows -->
                     </div>
-                    <small style="display: block; margin-top: 15px; color: var(--gray-500);">
+                    <small class="variants-admin-help">
                         Ej: Talla: XL, Color: Azul, Memoria: 128GB. El precio sobreescribe al base si es > 0.
                     </small>
                 </div>
