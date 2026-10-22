@@ -5,7 +5,7 @@
 // Variables globales para almacenar los datos
 let productos = [];
 let categorias = [];
-const DEFAULT_WHATSAPP_NUMBER = '51926093080';
+const DEFAULT_WHATSAPP_NUMBER = '51931137799';
 // Carrito y Selección
 let socialLinks = {
     whatsapp: `https://wa.me/${DEFAULT_WHATSAPP_NUMBER}`,

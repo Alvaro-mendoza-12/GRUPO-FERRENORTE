@@ -15,14 +15,19 @@ CREATE TABLE IF NOT EXISTS configuracion (
     logo_url TEXT,
     nombre_sitio TEXT DEFAULT 'GRUPO FERRENORTE RO&MY E.I.R.L',
     descripcion_sitio TEXT,
-    contacto_whatsapp TEXT DEFAULT '51904068052',
+    contacto_whatsapp TEXT DEFAULT '51931137799',
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
 -- 3. Insertar configuración por defecto (solo si no existe)
 INSERT INTO configuracion (logo_url, nombre_sitio, descripcion_sitio, contacto_whatsapp)
-SELECT 'img/logo.jpeg', 'GRUPO FERRENORTE RO&MY E.I.R.L', 'Expertos en herramientas profesionales, EPP y equipamiento comercial.', '51904068052'
+SELECT 'img/logo.jpeg', 'GRUPO FERRENORTE RO&MY E.I.R.L', 'Expertos en herramientas profesionales, EPP y equipamiento comercial.', '51931137799'
 WHERE NOT EXISTS (SELECT 1 FROM configuracion);
+
+-- Actualizar el número de WhatsApp de la configuración existente
+UPDATE configuracion
+SET contacto_whatsapp = '51931137799'
+WHERE contacto_whatsapp IS DISTINCT FROM '51931137799';
 
 -- 4. Habilitar RLS en configuracion
 ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
