@@ -8,7 +8,7 @@
     <!-- SEO Básico -->
     <title>GRUPO FERRENORTE RO&MY E.I.R.L | Ferretería Industrial e Implementación Comercial</title>
     <meta name="description"
-        content="GRUPO FERRENORTE RO&MY E.I.R.L - Expertos en herramientas profesionales, EPP, seguridad industrial y soluciones de estantería metálica para implementación comercial en todo Perú.">
+        content="GRUPO FERRENORTE RO&MY E.I.R.L - Catálogo de herramientas, productos ferreteros y equipamiento comercial. Consulta productos y solicita tu cotización por WhatsApp.">
     <meta name="keywords"
         content="ferretería, herramientas, herramientas manuales, herramientas eléctricas, EPP, GRUPO FERRENORTE RO&MY, GRUPO FERRENORTE, grupo ferrenorte, FERRENORTE, ferrenorte, seguridad industrial, muebles comerciales, estantes, estantería metálica, implementación comercial, grupo ferrenorte, ro&my, ferretería perú, estantes para tiendas, ganchos para panel, discos de corte, taladros, martillos, tornillería, pintura industrial, góndolas, canastas de compras, carritos de supermercado, exhibidores de marca, soluciones para negocios, construcción, ferretería profesional, materiales eléctricos, equipos de protección personal, racks industriales, exhibidores de melamina, estantería para almacén">
     <meta name="author" content="GRUPO FERRENORTE RO&MY E.I.R.L">
@@ -16,9 +16,9 @@
 
     <!-- Open Graph / Meta etiquetas para Redes Sociales (Facebook, LinkedIn) -->
     <meta property="og:type" content="website">
-    <meta property="og:title" content="GRUPO FERRENORTE RO&MY E.I.R.L | Calidad en Ferretería e Implementación">
+    <meta property="og:title" content="GRUPO FERRENORTE RO&MY E.I.R.L | Ferretería e implementación comercial">
     <meta property="og:description"
-        content="Soluciones integrales para tu negocio. Herramientas, EPP y mobiliario comercial de alta gama.">
+        content="Herramientas, productos ferreteros y mobiliario para tu negocio. Explora el catálogo y solicita una cotización.">
     <meta property="og:image" content="img/logo.jpeg">
     <meta property="og:url" content="https://grupo-ferrenorte.web.app/">
     <!-- Reemplazar con tu URL final si es distinta -->
@@ -39,133 +39,87 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link
-        href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700;800&family=Inter:wght@300;400;500;600;700&display=swap"
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap"
         rel="stylesheet">
     <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@fortawesome/fontawesome-free@7.3.1/css/all.min.css">
 </head>
 
 <body id="top">
     <a class="skip-link" href="#productos">Saltar al catálogo</a>
-    <!-- Header Navigation -->
+    <!-- Commerce header: search is available without opening mobile navigation. -->
     <header class="header" id="header">
-        <nav class="navbar">
+        <div class="navbar">
             <div class="container nav-container">
-                <div class="logo-container">
-                    <img src="img/logo.jpeg" alt="GRUPO FERRENORTE RO&MY Logo" class="logo" id="siteLogo">
-                    <div class="brand-name">
-                        <span class="brand-main" id="siteBrandMain">GRUPO FERRENORTE</span>
-                        <span class="brand-sub" id="siteBrandSub">RO&MY E.I.R.L</span>
-                    </div>
+                <a class="logo-container" href="#hero" aria-label="Ferrenorte, inicio">
+                    <img src="img/logo.jpeg" alt="RO&MY" class="logo" id="siteLogo" width="52" height="52">
+                    <span class="brand-name">
+                        <span class="brand-main" id="siteBrandMain">FERRENORTE</span>
+                        <span class="brand-sub" id="siteBrandSub">FERRETERÍA Y EQUIPAMIENTO</span>
+                    </span>
+                </a>
+                <div class="search-wrapper desktop-search" role="search">
+                    <input type="search" class="searchInput" aria-label="Buscar productos" placeholder="¿Qué necesitas para tu negocio?" autocomplete="off">
+                    <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search" aria-hidden="true"></i></button>
+                    <div class="search-results-dropdown" id="searchResultsDropdown"></div>
                 </div>
-
-                <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Abrir menú de navegación"
-                    aria-expanded="false" aria-controls="navMenu">
-                    <span></span>
-                    <span></span>
-                    <span></span>
-                </button>
-
+                <div class="nav-actions">
+                    <button aria-label="Abrir lista de cotización" id="cartToggleBtn" class="cart-toggle-btn">
+                        <i class="fas fa-file-invoice" aria-hidden="true"></i>
+                        <span class="cart-text">Mi cotización</span>
+                        <span class="cart-count">0</span>
+                    </button>
+                    <button class="mobile-menu-toggle" id="mobileMenuToggle" aria-label="Abrir menú de navegación" aria-expanded="false" aria-controls="navMenu">
+                        <span></span><span></span><span></span>
+                    </button>
+                </div>
+                <div class="search-wrapper mobile-search" role="search">
+                    <input type="search" class="searchInput" aria-label="Buscar productos" placeholder="Busca productos y herramientas" autocomplete="off">
+                    <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search" aria-hidden="true"></i></button>
+                    <div class="search-results-dropdown mobile" id="searchResultsDropdownMobile"></div>
+                </div>
+            </div>
+        </div>
+        <nav class="secondary-nav" aria-label="Navegación principal">
+            <div class="container secondary-nav-container">
                 <ul class="nav-menu" id="navMenu">
-                    <li class="mobile-search-li">
-                        <div class="search-wrapper mobile-search">
-                            <input type="text" class="searchInput" aria-label="Buscar productos" placeholder="Buscar...">
-                            <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search"></i></button>
-                            <div class="search-results-dropdown mobile" id="searchResultsDropdownMobile"></div>
-                        </div>
-                    </li>
-                    <li><a href="#hero" class="nav-link active">Inicio</a></li>
-                    <li><a href="#productos" class="nav-link">Productos</a></li>
-                    <li><a href="#categorias" class="nav-link">Categorías</a></li>
-                    <li><a href="#sobre-nosotros" class="nav-link">Nosotros</a></li>
+                    <li><a href="#categorias" class="nav-link nav-link-categories"><i class="fas fa-bars" aria-hidden="true"></i> Categorías</a></li>
+                    <li><a href="#productos" class="nav-link">Todos los productos</a></li>
+                    <li><a href="#sobre-nosotros" class="nav-link">Conoce Ferrenorte</a></li>
                     <li><a href="#contacto" class="nav-link">Contacto</a></li>
                 </ul>
-
-                <div class="nav-actions">
-                    <div class="search-wrapper desktop-search">
-                        <input type="text" class="searchInput" aria-label="Buscar productos" placeholder="Buscar productos...">
-                        <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search"></i></button>
-                        <div class="search-results-dropdown" id="searchResultsDropdown"></div>
-                    </div>
-                    <button aria-label="Abrir lista de cotización" id="cartToggleBtn" class="cart-toggle-btn">
-                        <i class="fas fa-file-invoice"></i>
-                        <span class="cart-count">0</span>
-                        <span class="cart-text">Cotizar</span>
-                    </button>
-                    <a href="admin.html" class="admin-login-btn" title="Acceso Admin">
-                        <i class="fas fa-user-circle"></i>
-                    </a>
-                </div>
+                <a class="header-help" href="#contacto"><i class="fab fa-whatsapp" aria-hidden="true"></i> ¿Necesitas ayuda?</a>
             </div>
         </nav>
     </header>
     <div id="mobileNavBackdrop" class="mobile-nav-backdrop"></div>
 
-    <!-- Hero Section -->
+    <main>
     <section class="hero" id="hero">
-        <div class="hero-background"></div>
         <div class="container hero-content">
             <div class="hero-text">
-                <p class="eyebrow">FERRETERÍA · IMPLEMENTACIÓN COMERCIAL</p>
+                <p class="eyebrow">FERRETERÍA E IMPLEMENTACIÓN COMERCIAL</p>
                 <h1 class="hero-title">
-                    <span class="title-line" id="heroTitleLine1">Tu negocio empieza</span>
-                    <span class="title-line gradient-text" id="heroTitleLine2">con buenas herramientas.</span>
+                    <span class="title-line" id="heroTitleLine1">Equipa tu negocio.</span>
+                    <span class="title-line" id="heroTitleLine2">Hazlo bien.</span>
                 </h1>
-                <p class="hero-description" id="heroDescription">
-                    Expertos en productos ferreteros, muebles para implementación comercial y accesorios especializados.
-                    Calidad garantizada para impulsar tu emprendimiento.
-                </p>
+                <p class="hero-description" id="heroDescription">Herramientas, mobiliario y accesorios para tu trabajo. Encuentra lo que necesitas y cotízalo con nosotros.</p>
                 <div class="hero-buttons">
-                    <a href="#productos" class="btn btn-primary">
-                        <span>Ver Productos</span>
-                        <i class="fas fa-arrow-right"></i>
-                    </a>
-                    <a href="#contacto" class="btn btn-secondary">
-                        <i class="fab fa-whatsapp"></i>
-                        <span>Contáctanos</span>
-                    </a>
-                </div>
-                <div class="hero-trust">
-                    <div class="trust-item">
-                        <i class="fas fa-award"></i>
-                        <span>Calidad Garantizada</span>
-                    </div>
-                    <div class="trust-item">
-                        <i class="fas fa-truck-fast"></i>
-                        <span>Atención Rápida</span>
-                    </div>
-                    <div class="trust-item">
-                        <i class="fas fa-headset"></i>
-                        <span>Asesoría Especializada</span>
-                    </div>
+                    <a href="#productos" class="btn btn-primary">Explorar catálogo <i class="fas fa-arrow-right" aria-hidden="true"></i></a>
+                    <a href="#contacto" class="hero-contact-link">Hablar con un asesor <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>
                 </div>
             </div>
-            <div class="hero-visual store-showcase">
-                <a class="showcase-main" href="#productos">
-                    <img src="img/PRODUCTOS FERRETEROS/heramientas.jpeg" alt="Herramientas para equipar tu negocio" fetchpriority="high" width="542" height="364">
-                    <span class="showcase-label"><small>EQUIPA TU PRÓXIMO PROYECTO</small><strong>Herramientas profesionales <span aria-hidden="true">↗</span></strong></span>
-                </a>
-                <a class="showcase-link" href="#categorias"><span><small>EXHIBE. ORGANIZA. CRECE.</small><strong>Mobiliario y accesorios comerciales</strong></span><span aria-hidden="true">↗</span></a>
-            </div>
-        </div>
-        <div class="hero-wave">
-            <svg viewBox="0 0 1200 120" preserveAspectRatio="none">
-                <path d="M0,0 C150,100 350,0 600,50 C850,100 1050,0 1200,50 L1200,120 L0,120 Z"
-                    fill="url(#waveGradient)"></path>
-                <defs>
-                    <linearGradient id="waveGradient" x1="0%" y1="0%" x2="100%" y2="0%">
-                        <stop offset="0%" style="stop-color:#1e3a8a;stop-opacity:0.1" />
-                        <stop offset="100%" style="stop-color:#f59e0b;stop-opacity:0.1" />
-                    </linearGradient>
-                </defs>
-            </svg>
+            <a class="hero-visual showcase-main" href="#productos">
+                <img src="img/PRODUCTOS FERRETEROS/caja de herramientas.jpeg" alt="Caja con herramientas manuales para equipar tu trabajo" fetchpriority="high" width="412" height="310">
+                <span class="showcase-label"><span>PARA CADA TRABAJO</span><strong>Empieza por las herramientas <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></strong></span>
+            </a>
         </div>
     </section>
 
-    <section class="service-strip" aria-label="Cómo comprar">
+    <section class="service-strip" aria-label="Cómo cotizar">
         <div class="container service-grid">
-            <div><span>01</span><p><strong>Encuentra lo que necesitas</strong>Explora herramientas y equipamiento.</p></div>
-            <div><span>02</span><p><strong>Arma tu cotización</strong>Elige productos, opciones y cantidades.</p></div>
-            <div><span>03</span><p><strong>Conversa con un asesor</strong>Confirma precios y entrega por WhatsApp.</p></div>
+            <div><span>01</span><p><strong>Explora el catálogo</strong>Encuentra productos para tu negocio.</p></div>
+            <div><span>02</span><p><strong>Prepara tu lista</strong>Elige opciones y cantidades.</p></div>
+            <div><span>03</span><p><strong>Cotiza por WhatsApp</strong>Consulta precio, disponibilidad y entrega.</p></div>
         </div>
     </section>
 
@@ -173,11 +127,11 @@
     <section class="featured-section" id="productos">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Encuentra lo que tu negocio necesita</h2>
-                <p class="section-subtitle">Explora nuestro catálogo y solicita una cotización personalizada. Sin pagos en línea.</p>
+                <div><p class="eyebrow">ELIGE. CONSULTA. EQUIPA.</p><h2 class="section-title">Productos para tu negocio</h2></div>
+                <p class="section-subtitle">Precios de referencia. Confirma las condiciones con un asesor antes de comprar.</p>
             </div>
 
-            <div class="catalog-note"><span>CATÁLOGO DE PRODUCTOS</span><a href="#categorias">Explorar categorías ↗</a></div>
+            <div class="catalog-note"><span>Catálogo disponible</span><a href="#categorias">Explorar por categoría <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a></div>
             <div class="products-grid" id="productsGrid" aria-live="polite" aria-label="Catálogo de productos">
                 <!-- Los productos se cargarán dinámicamente desde script.js -->
             </div>
@@ -210,8 +164,8 @@
     <section class="categories-section" id="categorias">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Nuestras Categorías</h2>
-                <p class="section-subtitle">Soluciones integrales para tu negocio</p>
+                <h2 class="section-title">Explora por categoría</h2>
+                <p class="section-subtitle">Encuentra la línea de productos que necesitas.</p>
             </div>
 
             <div class="categories-grid" id="categoriesGrid">
@@ -220,57 +174,17 @@
         </div>
     </section>
 
-    <!-- About Section -->
     <section class="about-section" id="sobre-nosotros">
-        <div class="container">
-            <div class="about-content">
-                <div class="about-image">
-                    <div class="image-wrapper">
-                        <img src="img/logo.jpeg" alt="GRUPO FERRENORTE RO&MY">
-                        <div class="image-decoration"></div>
-                    </div>
-                </div>
-                <div class="about-text">
-                    <h2 class="section-title">Sobre Nosotros</h2>
-                    <h3 class="about-company">GRUPO FERRENORTE RO&MY E.I.R.L</h3>
-                    <p class="about-description">
-                        Somos una empresa dedicada a la distribución de productos ferreteros y soluciones para
-                        implementación comercial.
-                        Con años de experiencia en el mercado, nos especializamos en brindar productos de alta calidad
-                        que satisfacen
-                        las necesidades de nuestros clientes.
-                    </p>
-                    <div class="about-features">
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <div>
-                                <h4>Calidad Garantizada</h4>
-                                <p>Herramientas y soluciones para tu negocio</p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <div>
-                                <h4>Asesoría Profesional</h4>
-                                <p>Expertos para ayudarte en tu proyecto</p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <div>
-                                <h4>Mejores Precios</h4>
-                                <p>Precios competitivos del mercado</p>
-                            </div>
-                        </div>
-                        <div class="feature-item">
-                            <i class="fas fa-check-circle"></i>
-                            <div>
-                                <h4>Entrega Rápida</h4>
-                                <p>Envíos seguros y puntuales</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+        <div class="container about-content">
+            <div class="about-intro">
+                <p class="eyebrow">CONOCE FERRENORTE</p>
+                <h2 class="section-title">El equipamiento es parte<br>de tu negocio. Y del nuestro.</h2>
+            </div>
+            <div class="about-text">
+                <h3 class="about-company">GRUPO FERRENORTE RO&MY E.I.R.L</h3>
+                <p class="about-description">Nos dedicamos a la distribución de productos ferreteros y soluciones para implementación comercial. En nuestro catálogo puedes consultar herramientas, mobiliario y accesorios para equipar tu espacio de trabajo.</p>
+                <p class="about-description">Reúne los productos que te interesan en una sola lista. Nuestro equipo te ayudará a confirmar opciones, disponibilidad y condiciones de entrega.</p>
+                <a class="text-link" href="#contacto">Conversemos sobre tu proyecto <svg class="arrow-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><path d="M4 12h15m-6-6 6 6-6 6"/></svg></a>
             </div>
         </div>
     </section>
@@ -279,14 +193,14 @@
     <section class="contact-section" id="contacto">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Contáctanos</h2>
-                <p class="section-subtitle">Estamos aquí para ayudarte</p>
+                <h2 class="section-title">Hablemos de lo que necesitas</h2>
+                <p class="section-subtitle">Consulta un producto o solicita información para tu proyecto.</p>
             </div>
 
             <div class="contact-content">
                 <div class="contact-info">
-                    <h3>Información de Contacto</h3>
-                    <p>¿Tienes alguna consulta? No dudes en contactarnos por cualquiera de nuestros canales.</p>
+                    <h3>Contacto directo</h3>
+                    <p>Estas son nuestras vías de contacto y los datos de nuestro negocio.</p>
 
                     <div class="info-items">
                         <div class="info-item">
@@ -351,6 +265,8 @@
 
                 <div class="contact-form-wrapper">
                     <form class="contact-form" id="contactForm">
+                        <h3>Cuéntanos qué buscas</h3>
+                        <p class="form-intro">Prepararemos tu mensaje para que lo envíes por WhatsApp.</p>
                         <div class="form-group">
                             <label for="name">Nombre Completo</label>
                             <input type="text" id="name" name="name" required>
@@ -378,14 +294,16 @@
                             <textarea id="message" name="message" rows="5" required></textarea>
                         </div>
                         <button type="submit" class="btn btn-primary submit-btn">
-                            <span>Enviar Mensaje</span>
-                            <i class="fas fa-paper-plane"></i>
+                            <span>Continuar en WhatsApp</span>
+                            <i class="fab fa-whatsapp" aria-hidden="true"></i>
                         </button>
                     </form>
                 </div>
             </div>
         </div>
     </section>
+
+    </main>
 
     <!-- Footer -->
     <footer class="footer">
@@ -395,18 +313,17 @@
                     <div class="footer-logo">
                         <img src="img/logo.jpeg" alt="GRUPO FERRENORTE RO&MY Logo">
                         <div class="footer-brand">
-                            <span class="footer-brand-main">GRUPO FERRENORTE</span>
+                            <span class="footer-brand-main">FERRENORTE</span>
                             <span class="footer-brand-sub">RO&MY E.I.R.L</span>
                         </div>
                     </div>
                     <p class="footer-description">
-                        Tu socio confiable en productos ferreteros y soluciones comerciales. Calidad y compromiso
-                        garantizado.
+                        Productos ferreteros y equipamiento comercial para tu negocio. Consulta el catálogo y arma tu lista de cotización.
                     </p>
                 </div>
 
                 <div class="footer-section">
-                    <h4 class="footer-title">Enlaces Rápidos</h4>
+                    <h4 class="footer-title">Explora Ferrenorte</h4>
                     <ul class="footer-links">
                         <li><a href="#hero">Inicio</a></li>
                         <li><a href="#productos">Productos</a></li>
@@ -417,28 +334,24 @@
                 </div>
 
                 <div class="footer-section">
-                    <h4 class="footer-title">Categorías</h4>
-                    <ul class="footer-links">
-                        <li><a href="#categorias">Productos Ferreteros</a></li>
-                        <li><a href="#categorias">Muebles Comerciales</a></li>
-                        <li><a href="#categorias">Accesorios</a></li>
-                        <li><a href="#categorias">Equipos de Protección</a></li>
-                    </ul>
+                    <h4 class="footer-title">Tu cotización</h4>
+                    <p class="footer-description">Añade productos a tu lista y consúltalos por WhatsApp. No se realizan pagos en esta web.</p>
+                    <a class="footer-admin-link" href="admin.html"><i class="fas fa-user-circle" aria-hidden="true"></i> Acceso de administración</a>
                 </div>
 
                 <div class="footer-section">
                     <h4 class="footer-title">Redes Sociales</h4>
                     <div class="footer-social">
-                        <a href="#" class="footer-social-link whatsapp">
+                        <a href="#" class="footer-social-link whatsapp" aria-label="WhatsApp">
                             <i class="fab fa-whatsapp"></i>
                         </a>
-                        <a href="#" class="footer-social-link facebook">
+                        <a href="#" class="footer-social-link facebook" aria-label="Facebook">
                             <i class="fab fa-facebook"></i>
                         </a>
-                        <a href="#" class="footer-social-link tiktok">
+                        <a href="#" class="footer-social-link tiktok" aria-label="TikTok">
                             <i class="fab fa-tiktok"></i>
                         </a>
-                        <a href="#" class="footer-social-link instagram">
+                        <a href="#" class="footer-social-link instagram" aria-label="Instagram">
                             <i class="fab fa-instagram"></i>
                         </a>
                     </div>
@@ -484,7 +397,7 @@
                     <!-- Opciones de Producto (Colores/Medidas/etc) -->
                     <div id="modalProductVariants" class="modal-variants" style="display: none;">
                         <h4 class="modal-subtitle">
-                            Seleccionar Opción:</h4>
+                            Elige una opción</h4>
                         <div id="variantsSelectorContainer" class="variants-selector-container">
                             <!-- Injected by JS -->
                         </div>
@@ -495,9 +408,10 @@
                         <span id="modalProductStock" class="badge"></span>
                     </div>
 
+                    <p class="price-disclaimer">Precio de referencia. Confirma disponibilidad y condiciones con un asesor.</p>
+
                     <div class="modal-qty-block">
-                        <label class="modal-subtitle">Seleccionar
-                            Cantidad:</label>
+                        <label class="modal-subtitle">Cantidad</label>
                         <div class="qty-control">
                             <button type="button" onclick="changeModalQty(-1)">-</button>
                             <input type="number" id="modalQty" aria-label="Cantidad a cotizar" max="999" value="1" min="1" readonly>
@@ -507,7 +421,7 @@
 
                     <div id="modalProductSpecsContainer" class="modal-specs-container" style="display: none;">
                         <h4 class="modal-specs-title">
-                            Documentación Adicional:</h4>
+                            Documentación del producto</h4>
                         <a id="modalProductSpecsLink" rel="noopener noreferrer" href="#" target="_blank" class="btn-specs-download">
                             <i class="fas fa-file-pdf"></i> Descargar Ficha Técnica
                         </a>
@@ -515,10 +429,10 @@
 
                     <div class="product-detail-actions modal-detail-actions">
                         <button id="addToQuoteBtn" class="btn btn-primary modal-add-quote-btn">
-                            <i class="fas fa-plus-circle"></i> AÑADIR A MI LISTA
+                            <i class="fas fa-plus" aria-hidden="true"></i> Añadir a mi cotización
                         </button>
                         <a href="#" id="modalWhatsAppBtn" rel="noopener noreferrer" class="whatsapp-btn-large modal-whatsapp-btn" target="_blank">
-                            <i class="fab fa-whatsapp"></i> Chat Directo con un Asesor
+                            <i class="fab fa-whatsapp"></i> Consultar este producto
                         </a>
                     </div>
                 </div>
@@ -530,7 +444,7 @@
     <!-- Side Quote Panel Móvil/Escritorio Final -->
     <div id="quoteSidebar" inert aria-hidden="true" class="quote-sidebar" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
         <div class="quote-sidebar-header">
-            <h3 id="quoteTitle">Mi Cotización</h3>
+            <h3 id="quoteTitle">Mi cotización</h3>
             <button id="closeQuoteSidebar" class="close-btn" aria-label="Cerrar cotización"><i class="fas fa-times"></i></button>
         </div>
         <div id="quoteItemsList" class="quote-items-list">
@@ -550,7 +464,7 @@
 
                 <div class="location-divider">
                     <div class="location-divider-line"></div>
-                    <span class="location-divider-text">Ó USA TU GPS</span>
+                    <span class="location-divider-text">O COMPARTE TU UBICACIÓN</span>
                     <div class="location-divider-line"></div>
                 </div>
 
@@ -561,11 +475,11 @@
                 <input type="hidden" id="userCoords">
             </div>
             <div class="quote-summary quote-summary-custom">
-                <span class="quote-summary-label">Total de Productos:</span>
+                <span class="quote-summary-label">Unidades en tu lista:</span>
                 <span id="quoteTotalCount" class="quote-summary-count">0</span>
             </div>
             <button id="sendQuoteBtn" class="send-quote-btn send-quote-btn-custom" aria-describedby="quoteValidationNotice">
-                <i class="fab fa-whatsapp"></i> Generar Cotización Profesional
+                <i class="fab fa-whatsapp"></i> Consultar mi lista por WhatsApp
             </button>
         </div>
     </div>

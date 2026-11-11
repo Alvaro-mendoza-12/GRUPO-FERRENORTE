@@ -107,3 +107,9 @@ El envío queda bloqueado mientras faltan verificaciones, hay errores o seleccio
 La integración anterior a `borrador-principal` quedó verificada en `6855290`, igual que la rama de mejoras en ese momento; `main` permaneció en `4312f45`. Este lote debe revisarse y probarse antes de avanzar de nuevo el borrador.
 
 Verificación final de este lote: 168 pruebas locales aprobadas, sintaxis, build y revisión independiente. También se comprobó que el reintento refresca la categoría visible, conserva el foco de la cotización e invalida el diálogo anterior para impedir que una opción antigua sobrescriba datos recién verificados. Pruebas con datos simulados; sin acceso a datos reales ni envío de WhatsApp.
+
+## Rediseño tras revisión del usuario
+
+El usuario rechazó el diseño anterior, especialmente la paleta. Se sustituyó el sistema visual público por una base blanca/carbón con acento verde pino, buscador protagonista, tarjetas uniformes y contenido comercial más directo. La investigación, decisiones y alcance de QA están en `REDISENO-CATALOGO-2026-11-11.md`.
+
+Verificación: 173 pruebas, sintaxis, build y revisión independiente; además navegador real con catálogo simulado, búsqueda, variantes, cantidades, cotización interceptada y anchos 390/768 px en marcos de prueba. Se detectaron y corrigieron tarjetas invisibles por animación e imágenes verticales con alturas irregulares. No se enviaron mensajes, no se probó Supabase real y no hubo despliegue. Este rediseño se entrega primero en `dot/ferrenorte-storefront`; no se integra automáticamente al borrador ni a `main`.

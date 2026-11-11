@@ -252,23 +252,23 @@ function renderProductos(filtered = null) {
     }
 
     grid.innerHTML = dataToShow.map(producto => `
-        <div class="product-card" onclick="verDetalleProducto(${producto.id})" style="cursor: pointer;">
+        <div class="product-card" onclick="verDetalleProducto(${producto.id})">
             <div class="product-image">
                 <img src="${escapeHTML(producto.imagen)}" alt="${escapeHTML(producto.titulo)}" loading="lazy">
                 ${producto.badge ? `<div class="product-badge ${producto.badgeColor === 'new' ? 'new' : ''}">${escapeHTML(producto.badge)}</div>` : ''}
             </div>
-            <div class="product-content" style="padding: 20px;">
-                <h3 class="product-title" style="font-size: 15px; min-height: 40px; margin-bottom: 12px;">${escapeHTML(producto.titulo)}</h3>
+            <div class="product-content">
+                <h3 class="product-title">${escapeHTML(producto.titulo)}</h3>
                 
-                <div class="product-pricing" style="margin-bottom: 15px;">
+                <div class="product-pricing">
                     ${producto.precio > 0
-            ? `<div class="price-main" style="font-size: 22px; font-weight: 800; color: var(--primary-blue);">S/ ${parseFloat(producto.precio).toFixed(2)}</div>`
-            : `<div class="price-consult" style="font-size: 16px; font-weight: 700; color: var(--gray-500);">PRECIO A CONSULTAR</div>`
+            ? `<div class="price-main">S/ ${parseFloat(producto.precio).toFixed(2)}</div>`
+            : `<div class="price-consult">Consultar precio</div>`
         }
                 </div>
 
-                <div class="product-card-actions" style="display: flex; gap: 8px;">
-                    <button class="btn-add-pill" onclick="event.stopPropagation(); verDetalleProducto(${producto.id})" style="flex: 1; padding: 10px; border: 2px solid var(--primary-orange); color: var(--primary-orange); background: transparent; border-radius: 25px; font-weight: 800; font-size: 13px; transition: all 0.3s;">
+                <div class="product-card-actions">
+                    <button class="btn-add-pill" aria-label="Ver ${escapeHTML(producto.titulo)}" onclick="event.stopPropagation(); verDetalleProducto(${producto.id})">
                         Ver producto
                     </button>
                 </div>
@@ -363,18 +363,18 @@ function renderCategoryProducts(id) {
     if (grid) {
         if (productosFiltrados.length > 0) {
             grid.innerHTML = productosFiltrados.map(p => `
-                <div class="product-card" onclick="verDetalleProducto(${p.id})" style="cursor: pointer;">
+                <div class="product-card" onclick="verDetalleProducto(${p.id})">
                     <div class="product-image">
                         <img src="${escapeHTML(p.imagen)}" alt="${escapeHTML(p.titulo)}" loading="lazy">
                         ${p.badge ? `<div class="product-badge ${p.badgeColor === 'new' ? 'new' : ''}">${escapeHTML(p.badge)}</div>` : ''}
                     </div>
                     <div class="product-content">
                         <h3 class="product-title">${escapeHTML(p.titulo)}</h3>
-                        ${p.precio > 0 ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px;">S/ ${parseFloat(p.precio).toFixed(2)}</div>` : ''}
+                        <div class="product-pricing">${p.precio > 0 ? `<div class="price-main">S/ ${parseFloat(p.precio).toFixed(2)}</div>` : '<div class="price-consult">Consultar precio</div>'}</div>
                         <p class="product-description">${escapeHTML(p.descripcion)}</p>
-                        <div class="product-card-footer" style="display: flex; gap: 10px; margin-top: 15px;">
-                            <button class="product-link" onclick="event.stopPropagation(); verDetalleProducto(${p.id})">Detalles</button>
-                            <button class="btn-quote-small" onclick="event.stopPropagation(); addToQuote(${p.id})" style="background: var(--gray-100); border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--primary-blue); font-weight: 700;"><i class="fas fa-plus"></i></button>
+                        <div class="product-card-footer">
+                            <button class="product-link" aria-label="Ver ${escapeHTML(p.titulo)}" onclick="event.stopPropagation(); verDetalleProducto(${p.id})">Ver producto</button>
+                            <button class="btn-quote-small" aria-label="Añadir ${escapeHTML(p.titulo)} a mi cotización" onclick="event.stopPropagation(); addToQuote(${p.id})"><i class="fas fa-plus"></i></button>
                         </div>
                     </div>
                 </div>
@@ -494,8 +494,8 @@ function verDetalleProducto(id) {
         badge.innerText = producto.badge;
         // Asumiendo que el color está en badgeColor por convención
         badge.className = 'product-detail-badge';
-        if (producto.badgeColor === 'new') badge.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)';
-        else badge.style.background = 'var(--primary-orange)';
+        if (producto.badgeColor === 'new') badge.style.background = 'var(--accent)';
+        else badge.style.background = 'var(--ink)';
         badge.style.display = 'block';
     } else {
         badge.style.display = 'none';
@@ -1008,7 +1008,7 @@ function renderSearchDropdown(results) {
         if (!dropdown) return;
 
         if (results.length === 0) {
-            dropdown.innerHTML = '<div style="padding: 15px; text-align: center; color: var(--gray-400); font-size: 13px;">No se encontraron productos</div>';
+            dropdown.innerHTML = '<div class="search-empty">No se encontraron productos</div>';
         } else {
             dropdown.innerHTML = results.map(p => `
                 <div class="search-result-item" onclick="verDetalleProducto(${p.id})">
@@ -1334,34 +1334,14 @@ if (contactForm) {
 }
 
 // ===========================
-// INTERSECTION OBSERVER FOR ANIMATIONS
+// CATALOG VISIBILITY
 // ===========================
-const observerOptions = {
-    threshold: 0.1,
-    rootMargin: '0px 0px -50px 0px'
-};
-
-// Función para observar elementos con animación
+// Product browsing must never depend on an observer or a scroll animation.
 function initializeAnimations() {
-    const fadeInElements = document.querySelectorAll('.product-card, .category-card, .stat-card, .feature-item');
-
-    const fadeInObserver = new IntersectionObserver((entries) => {
-        entries.forEach((entry, index) => {
-            if (entry.isIntersecting) {
-                setTimeout(() => {
-                    entry.target.style.opacity = '1';
-                    entry.target.style.transform = 'translateY(0)';
-                }, index * 100);
-                fadeInObserver.unobserve(entry.target);
-            }
-        });
-    }, observerOptions);
-
-    fadeInElements.forEach(element => {
-        element.style.opacity = '0';
-        element.style.transform = 'translateY(30px)';
-        element.style.transition = 'opacity 0.6s ease, transform 0.6s ease';
-        fadeInObserver.observe(element);
+    document.querySelectorAll('.product-card, .category-card, .stat-card, .feature-item').forEach(element => {
+        element.style.opacity = '1';
+        element.style.transform = 'none';
+        element.style.transition = '';
     });
 }
 

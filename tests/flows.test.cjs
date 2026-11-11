@@ -451,3 +451,66 @@ test('quote retry UI cannot send an option chosen from the preceding catalog',as
   assert.match(new URL(opened).searchParams.get('text'),/Opción actual/);
  } finally {dom.window.close()}
 });
+
+test('mobile catalog search remains outside the collapsible navigation',async()=>{
+ const {dom,w,d}=await app();try{
+ const menu=d.getElementById(d.getElementById('mobileMenuToggle').getAttribute('aria-controls'));
+ const search=d.querySelector('.mobile-search .searchInput');
+ assert.equal(menu.contains(search),false,'Search must be reachable without opening navigation');
+ search.value='martillo';search.dispatchEvent(new w.Event('input'));
+ assert.equal(d.querySelectorAll('#productsGrid .product-card').length,1);
+ assert.match(d.querySelector('#productsGrid').textContent,/Martillo/);
+ assert.equal(d.getElementById('mobileMenuToggle').getAttribute('aria-expanded'),'false');
+ }finally{dom.window.close()}
+});
+
+test('category cards disclose missing prices and identify their quote controls',async()=>{
+ const {dom,w,d}=await app();try{
+ w.verDetalleCategoria(1);
+ const cards=[...d.querySelectorAll('#categoryProductsGrid .product-card')];
+ assert.ok(cards[0].querySelector('.product-pricing'),'Category cards expose a price summary');
+ assert.match(cards[0].querySelector('.product-pricing').textContent,/S\/ 100\.00/);
+ assert.match(cards[1].querySelector('.product-pricing').textContent,/Consultar precio/i);
+ assert.match(cards[1].querySelector('.btn-quote-small').getAttribute('aria-label'),/Martillo/);
+ }finally{dom.window.close()}
+});
+
+test('catalog cards stay visible when intersection observers never report visibility',async()=>{
+ const {dom,w,d}=await app();try{
+ // app() deliberately supplies an observer that never calls its callback.
+ w.initializeAnimations();
+ const cards=[...d.querySelectorAll('.product-card, .category-card')];
+ assert.ok(cards.length>=3);
+ for(const card of cards){
+  assert.notEqual(w.getComputedStyle(card).opacity,'0','Published cards must not wait for a scroll callback');
+ }
+ }finally{dom.window.close()}
+});
+
+test('quote quantity and removal controls provide 44px touch targets',async()=>{
+ const {dom,w,d}=await app();try{
+ const style=d.createElement('style');style.textContent=fs.readFileSync('styles.css','utf8');d.head.append(style);
+ w.addToQuote(1);
+ const controls=d.querySelectorAll('.qty-control button, .remove-item-btn');
+ assert.ok(controls.length>=5);
+ for(const control of controls){
+  const actual=w.getComputedStyle(control);
+  assert.ok(parseFloat(actual.width)>=44,`${control.className||'Quantity button'} needs a 44px width`);
+  assert.ok(parseFloat(actual.height)>=44,`${control.className||'Quantity button'} needs a 44px height`);
+ }
+ }finally{dom.window.close()}
+});
+
+test('product photos cannot contribute their intrinsic height to card sizing',async()=>{
+ const {dom,w,d}=await app();try{
+ const style=d.createElement('style');style.textContent=fs.readFileSync('styles.css','utf8');d.head.append(style);
+ const media=d.querySelector('.product-image');
+ const photo=media.querySelector('img');
+ // A portrait image must be painted inside the square, not size the grid row.
+ photo.setAttribute('width','172');photo.setAttribute('height','350');
+ assert.equal(w.getComputedStyle(photo).position,'absolute');
+ assert.equal(w.getComputedStyle(media).aspectRatio,'1 / 1');
+ assert.equal(w.getComputedStyle(media).overflow,'hidden');
+ assert.equal(w.getComputedStyle(photo).objectFit,'contain');
+ }finally{dom.window.close()}
+});
