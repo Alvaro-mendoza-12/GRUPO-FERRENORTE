@@ -540,6 +540,8 @@
             </div>
         </div>
         <div class="quote-sidebar-footer">
+            <p id="quoteValidationNotice" class="quote-validation-notice" role="status" aria-live="polite" hidden></p>
+            <button id="retryQuoteValidationBtn" class="quote-review-options" type="button" hidden>Reintentar verificación</button>
             <div class="location-box">
                 <label class="location-label">Dirección
                     de Entrega:</label>
@@ -562,7 +564,7 @@
                 <span class="quote-summary-label">Total de Productos:</span>
                 <span id="quoteTotalCount" class="quote-summary-count">0</span>
             </div>
-            <button id="sendQuoteBtn" class="send-quote-btn send-quote-btn-custom">
+            <button id="sendQuoteBtn" class="send-quote-btn send-quote-btn-custom" aria-describedby="quoteValidationNotice">
                 <i class="fab fa-whatsapp"></i> Generar Cotización Profesional
             </button>
         </div>

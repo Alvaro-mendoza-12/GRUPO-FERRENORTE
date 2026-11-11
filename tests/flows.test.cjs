@@ -13,7 +13,7 @@ async function app(overrides={},options={}){
  if(options.cart) w.localStorage.setItem('ferrenorte_quote',JSON.stringify(options.cart));
  w.console={log(){},error(){},warn(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.IntersectionObserver=class {observe(){} unobserve(){}};
- w.supabaseClient={from(table){const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(resolve){const value=(table in overrides?overrides:fixture)[table];return Promise.resolve(typeof value==='function'?value():{data:value,error:null}).then(resolve)}};return q}};
+ w.supabaseClient={from(table){const query={table,filters:[]};const q={select(){return q},eq(key,value){query.filters.push([key,value]);return q},order(){return q},single(){return q},then(resolve){options.queries?.push(query);const value=(table in overrides?overrides:fixture)[table];return Promise.resolve(typeof value==='function'?value(query):{data:value,error:null}).then(resolve)}};return q}};
  w.eval(fs.readFileSync('script.js','utf8'));
  await new Promise(r=>setTimeout(r,15));
  return {dom,w,d:w.document};
@@ -128,7 +128,7 @@ test('Enter in product search opens matching catalog results',async()=>{
 });
 test('invalid persisted quote items cannot break WhatsApp generation',async()=>{
  const {dom,w,d}=await app({}, {cart:[{id:'1',titulo:null,qty:1},{id:'2',titulo:'Valid product',qty:2,precio:20}]});try{
- let opened;w.open=url=>{opened=url};assert.equal(d.querySelectorAll('#quoteItemsList .quote-item').length,1);assert.doesNotThrow(()=>w.generateWhatsAppQuote());assert.match(new URL(opened).searchParams.get('text'),/VALID PRODUCT/);
+ let opened;w.open=url=>{opened=url};assert.equal(d.querySelectorAll('#quoteItemsList .quote-item').length,1);assert.doesNotThrow(()=>w.generateWhatsAppQuote());assert.match(new URL(opened).searchParams.get('text'),/MARTILLO/);
  }finally{dom.window.close()}
 });
 
@@ -189,5 +189,265 @@ test('WhatsApp actions wait for the configured destination without blocking brow
   await new Promise(r=>setTimeout(r,5));w.generateWhatsAppQuote();
   assert.equal(new URL(opened[0]).pathname,'/51999888777');
   assert.equal(new URL(d.querySelector('.contact-whatsapp').href).pathname,'/51999888777');
+ } finally {dom.window.close()}
+});
+
+
+const savedQuote={id:'1',originalId:999,titulo:'Título anterior',precio:50,imagen:'old.png',qty:3};
+const tick=()=>new Promise(resolve=>setTimeout(resolve,5));
+
+test('restored quote refreshes published details without adding the item again',async()=>{
+ const {dom,w,d}=await app({}, {cart:[savedQuote]});
+ try {
+  const [item]=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(item.titulo,'Taladro');assert.equal(item.precio,100);assert.equal(item.imagen,'img/logo.jpeg');
+  assert.equal(item.originalId,1);assert.equal(item.qty,3);assert.equal('validation' in item,false);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+  let opened;w.open=url=>{opened=url};w.generateWhatsAppQuote();
+  assert.match(new URL(opened).searchParams.get('text'),/TALADRO/);
+  assert.doesNotMatch(new URL(opened).searchParams.get('text'),/ANTERIOR/);
+ } finally {dom.window.close()}
+});
+
+test('restored variants use active options of their product and preserve quantities',async()=>{
+ const queries=[];
+ const variants=[{id:9,producto_id:1,titulo:'Azul actual',precio:150,imagen_url:'azul.png',stock:0},{id:10,producto_id:1,titulo:'Negro actual',precio:0}];
+ const {dom,w,d}=await app({variantes:variants},{queries,cart:[{...savedQuote,id:'1_9',variante:'Azul anterior'},{...savedQuote,id:'1_10',qty:2,variante:'Negro anterior'}]});
+ try {
+  const items=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.deepEqual(items.map(item=>[item.variante,item.precio,item.imagen,item.qty]),[['Azul actual',150,'azul.png',3],['Negro actual',100,'img/logo.jpeg',2]]);
+  const calls=queries.filter(query=>query.table==='variantes');assert.equal(calls.length,1);
+  assert.deepEqual(calls[0].filters,[['producto_id',1],['activo',true]]);
+  assert.deepEqual(queries.find(query=>query.table==='productos').filters,[['activo',true]]);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+  let opened;w.open=url=>{opened=url};w.generateWhatsAppQuote();assert.match(new URL(opened).searchParams.get('text'),/Azul actual/);
+  assert.equal(variants[0].stock,0);
+ } finally {dom.window.close()}
+});
+
+test('pending published catalog blocks stale quotes even with a persisted verified flag',async()=>{
+ let finish;
+ const {dom,w,d}=await app({productos:()=>new Promise(resolve=>{finish=resolve})},{cart:[{...savedQuote,validation:'ready'}]});
+ try {
+  let opened=0;const alerts=[];w.open=()=>opened++;w.alert=message=>alerts.push(message);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.match(d.querySelector('#quoteValidationNotice').textContent,/verificando/i);
+  assert.doesNotMatch(d.querySelector('.quote-item-price').textContent,/50/);
+  w.generateWhatsAppQuote();assert.equal(opened,0);assert.match(alerts[0],/verificando/i);
+  w.addToQuote(1);assert.equal(d.querySelector('.cart-count').textContent,'3');
+  finish({data:fixture.productos,error:null});await tick();
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);w.generateWhatsAppQuote();assert.equal(opened,1);
+ } finally {dom.window.close()}
+});
+
+test('failed catalog preserves selections and offers a deduplicated retry',async()=>{
+ let calls=0;let finishRetry;
+ const {dom,w,d}=await app({productos:()=>++calls===1?{data:null,error:{message:'offline'}}:new Promise(resolve=>{finishRetry=resolve})},{cart:[savedQuote]});
+ try {
+  const opened=[];w.open=url=>opened.push(url);w.alert=()=>{};
+  assert.equal(d.querySelectorAll('.quote-item').length,1);assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.match(d.querySelector('#quoteValidationNotice').textContent,/No se pudo verificar/i);
+  w.generateWhatsAppQuote();assert.equal(opened.length,0);
+  d.querySelector('#retryQuoteValidationBtn').click();d.querySelector('#retryQuoteValidationBtn').click();await tick();
+  assert.equal(calls,2);assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  w.addToQuote(1);assert.equal(d.querySelector('.cart-count').textContent,'3');
+  finishRetry({data:fixture.productos,error:null});await tick();
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+  assert.equal(JSON.parse(w.localStorage.getItem('ferrenorte_quote'))[0].qty,3);
+  w.generateWhatsAppQuote();assert.equal(opened.length,1);
+ } finally {dom.window.close()}
+});
+
+test('unpublished products remain visible and block sending until explicitly removed',async()=>{
+ const {dom,w,d}=await app({}, {cart:[savedQuote,{...savedQuote,id:'99',titulo:'Retirado'}]});
+ try {
+  const opened=[];w.open=url=>opened.push(url);w.alert=()=>{};
+  assert.equal(d.querySelectorAll('.quote-item').length,2);assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.match(d.querySelectorAll('.quote-item')[1].textContent,/ya no está disponible/i);
+  assert.match(d.querySelectorAll('.remove-item-btn')[1].getAttribute('aria-label'),/Retirar.*Retirado/);
+  w.generateWhatsAppQuote();assert.equal(opened.length,0);
+  w.removeFromQuote('99');assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+  w.generateWhatsAppQuote();assert.equal(opened.length,1);
+ } finally {dom.window.close()}
+});
+
+test('removed or mismatched variants are not silently replaced by the base product',async()=>{
+ const {dom,w,d}=await app({variantes:[{id:9,producto_id:2,titulo:'De otro producto',precio:999}]},{cart:[{...savedQuote,id:'1_9',variante:'Opción retirada'}]});
+ try {
+  w.alert=()=>{};let opened=0;w.open=()=>opened++;
+  assert.equal(d.querySelectorAll('.quote-item').length,1);assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.match(d.querySelector('.quote-item').textContent,/opción ya no está disponible/i);
+  assert.match(d.querySelector('.quote-review-options').textContent,/Ver opciones/i);
+  assert.equal(JSON.parse(w.localStorage.getItem('ferrenorte_quote'))[0].id,'1_9');
+  w.generateWhatsAppQuote();assert.equal(opened,0);
+ } finally {dom.window.close()}
+});
+
+test('failed saved option validation can retry without losing the selection',async()=>{
+ let calls=0;
+ const {dom,w,d}=await app({variantes:()=>++calls===1?{data:null,error:{message:'offline'}}:{data:[{id:9,producto_id:1,titulo:'Actualizada',precio:125}],error:null}},{cart:[{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);assert.match(d.querySelector('#quoteValidationNotice').textContent,/No se pudo verificar/i);
+  d.querySelector('#retryQuoteValidationBtn').click();await tick();
+  assert.equal(calls,2);assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+  const [item]=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));assert.equal(item.variante,'Actualizada');assert.equal(item.qty,3);
+ } finally {dom.window.close()}
+});
+
+test('late option validation cannot restore a removed item or overwrite a newly added option',async()=>{
+ let finish;
+ const {dom,w,d}=await app({variantes:()=>new Promise(resolve=>{finish=resolve})},{url:'https://example.test/#categoria/1',cart:[{...savedQuote,id:'1_9',variante:'Vieja'},{...savedQuote,id:'1_10',variante:'Retirar'}]});
+ try {
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.equal(d.querySelectorAll('#categoryProductsGrid .product-card').length,2);
+  w.removeFromQuote('1_10');w.removeFromQuote('1_9');
+  w.addToQuote(1,2,{id:9,producto_id:1,titulo:'Selección reciente',precio:200});
+  finish({data:[{id:9,producto_id:1,titulo:'Respuesta anterior',precio:100},{id:10,producto_id:1,titulo:'No restaurar',precio:70}],error:null});await tick();
+  const items=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(items.length,1);assert.equal(items[0].variante,'Selección reciente');assert.equal(items[0].qty,2);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+ } finally {dom.window.close()}
+});
+
+
+test('an empty published catalog retains saved selections as unavailable, not failed',async()=>{
+ const {dom,w,d}=await app({productos:[]},{cart:[savedQuote]});
+ try {
+  assert.equal(d.querySelectorAll('.quote-item').length,1);
+  assert.match(d.querySelector('.quote-item').textContent,/ya no está disponible/i);
+  assert.equal(d.querySelector('#retryQuoteValidationBtn').hidden,true);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  assert.equal(JSON.parse(w.localStorage.getItem('ferrenorte_quote'))[0].qty,3);
+ } finally {dom.window.close()}
+});
+
+test('saved variants are checked separately for each published product',async()=>{
+ const queries=[];
+ const {dom,w,d}=await app({variantes:query=>({data:[{id:9,producto_id:query.filters[0][1],titulo:`Opción ${query.filters[0][1]}`,precio:125}],error:null})},
+  {queries,cart:[{...savedQuote,id:'1_9',variante:'Primera'},{...savedQuote,id:'2_9',variante:'Segunda'}]});
+ try {
+  const items=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.deepEqual(items.map(item=>[item.id,item.titulo,item.variante]),[['1_9','Taladro','Opción 1'],['2_9','Martillo','Opción 2']]);
+  assert.deepEqual(queries.filter(query=>query.table==='variantes').map(query=>query.filters),[[['producto_id',1],['activo',true]],[['producto_id',2],['activo',true]]]);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,false);
+ } finally {dom.window.close()}
+});
+
+test('a saved inactive option is retained for removal and cannot be quoted',async()=>{
+ const {dom,w,d}=await app({variantes:[{id:9,producto_id:1,titulo:'Inactiva',activo:false}]},{cart:[{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  assert.equal(d.querySelectorAll('.quote-item').length,1);
+  assert.match(d.querySelector('.quote-item').textContent,/opción ya no está disponible/i);
+  assert.equal(d.querySelector('#sendQuoteBtn').disabled,true);
+  w.openQuoteSidebar();d.querySelector('.quote-review-options[data-product-id]').click();
+  assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),true);
+  assert.equal(d.querySelector('#quoteSidebar').classList.contains('active'),false);
+ } finally {dom.window.close()}
+});
+
+test('saved option completion preserves the focused quote item and control',async()=>{
+ let finish;
+ const {dom,w,d}=await app({variantes:()=>new Promise(resolve=>{finish=resolve})},{cart:[savedQuote,{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  w.openQuoteSidebar();
+  const focused=d.querySelectorAll('.quote-item')[1].querySelector('.qty-control button:last-child');focused.focus();
+  finish({data:[{id:9,producto_id:1,titulo:'Actualizada',precio:150}],error:null});await tick();
+  const replacement=d.querySelectorAll('.quote-item')[1].querySelector('.qty-control button:last-child');
+  assert.notEqual(replacement,focused);assert.equal(d.activeElement,replacement);
+  w.changeCartQty('1_9',1);
+  assert.equal(d.activeElement,d.querySelectorAll('.quote-item')[1].querySelector('.qty-control button:last-child'));
+ } finally {dom.window.close()}
+});
+
+test('removing the focused quote line keeps focus inside the open dialog',async()=>{
+ const {dom,w,d}=await app({}, {cart:[savedQuote]});
+ try {
+  w.openQuoteSidebar();d.querySelector('.remove-item-btn').focus();w.removeFromQuote('1');
+  assert.equal(d.activeElement,d.querySelector('#closeQuoteSidebar'));
+  assert.equal(d.querySelector('#quoteSidebar').classList.contains('active'),true);
+ } finally {dom.window.close()}
+});
+
+test('background quote refresh never steals focus from another control or a closed panel',async()=>{
+ let finish;
+ const {dom,w,d}=await app({variantes:()=>new Promise(resolve=>{finish=resolve})},{cart:[{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  w.openQuoteSidebar();const address=d.querySelector('#manualAddress');address.focus();w.renderQuoteItems();assert.equal(d.activeElement,address);
+  w.closeQuoteSidebar();const search=d.querySelector('.searchInput');search.focus();
+  finish({data:[{id:9,producto_id:1,titulo:'Actualizada',precio:150}],error:null});await tick();
+  assert.equal(d.activeElement,search);
+ } finally {dom.window.close()}
+});
+
+test('catalog retry updates the visible category without navigation or resetting focus',async()=>{
+ let calls=0;let finish;
+ const {dom,w,d}=await app({productos:()=>++calls===1?{data:null,error:{message:'offline'}}:new Promise(resolve=>{finish=resolve})},
+  {url:'https://example.test/#categoria/1',cart:[savedQuote]});
+ try {
+  assert.equal(d.querySelectorAll('#categoryProductsGrid .product-card').length,0);
+  assert.equal(d.querySelector('#categoryNoProducts').style.display,'block');
+  w.openQuoteSidebar();d.querySelector('#retryQuoteValidationBtn').click();await tick();
+  const address=d.querySelector('#manualAddress');address.focus();address.value='Dirección conservada';
+  let scrolls=0;w.scrollTo=()=>scrolls++;
+  const historyLength=w.history.length;
+  finish({data:fixture.productos,error:null});await tick();
+  assert.equal(d.querySelectorAll('#categoryProductsGrid .product-card').length,2);
+  assert.equal(d.querySelector('#categoryNoProducts').style.display,'none');
+  assert.equal(d.activeElement,address);assert.equal(address.value,'Dirección conservada');
+  assert.equal(w.location.hash,'#categoria/1');assert.equal(w.history.length,historyLength);assert.equal(scrolls,0);
+  assert.equal(d.querySelector('#quoteSidebar').classList.contains('active'),true);
+  w.closeQuoteSidebar();assert.equal(d.querySelector('#categoryDetailView').style.display,'block');
+ } finally {dom.window.close()}
+});
+
+test('catalog retry invalidates an old modal and prevents stale option reselection during loading',async()=>{
+ let productCalls=0;let variantCalls=0;let finishProducts;let finishOldOptions;
+ const oldVariant={id:9,producto_id:1,titulo:'Opción anterior',precio:50};
+ const currentVariant={id:9,producto_id:1,titulo:'Opción actual',precio:200};
+ const {dom,w,d}=await app({
+  productos:()=>++productCalls===1?{data:fixture.productos,error:null}:new Promise(resolve=>{finishProducts=resolve}),
+  variantes:()=>{
+   variantCalls++;
+   if(variantCalls===1)return {data:null,error:{message:'offline'}};
+   if(variantCalls===2)return new Promise(resolve=>{finishOldOptions=resolve});
+   return {data:[currentVariant],error:null};
+  }
+ },{cart:[{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  w.alert=()=>{};
+  w.verDetalleProducto(1);await tick();assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),true);
+  w.retryQuoteValidation();await tick();
+  assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),false);
+  w.closeQuoteSidebar();w.verDetalleProducto(1);await tick();
+  assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),false);
+  assert.equal(variantCalls,2);
+  finishOldOptions({data:[oldVariant],error:null});await tick();
+  assert.equal(d.querySelectorAll('.variant-opt-btn').length,0);
+  finishProducts({data:[{...fixture.productos[0],titulo:'Taladro actual',precio:200}],error:null});await tick();
+  let [item]=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));assert.equal(item.precio,200);assert.equal(item.variante,'Opción actual');
+  w.verDetalleProducto(1);await tick();d.querySelector('.variant-opt-btn').click();d.querySelector('#addToQuoteBtn').click();
+  [item]=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(item.titulo,'Taladro actual');assert.equal(item.precio,200);assert.equal(item.variante,'Opción actual');
+ } finally {dom.window.close()}
+});
+
+test('quote retry UI cannot send an option chosen from the preceding catalog',async()=>{
+ let productCalls=0;let variantCalls=0;let finishProducts;
+ const currentVariant={id:9,producto_id:1,titulo:'Opción actual',precio:200};
+ const {dom,w,d}=await app({
+  productos:()=>++productCalls===1?{data:fixture.productos,error:null}:new Promise(resolve=>{finishProducts=resolve}),
+  variantes:()=>++variantCalls===1?{data:null,error:{message:'offline'}}:{data:[currentVariant],error:null}
+ },{cart:[{...savedQuote,id:'1_9',variante:'Anterior'}]});
+ try {
+  w.alert=()=>{};w.openQuoteSidebar();const retry=d.querySelector('#retryQuoteValidationBtn');retry.focus();retry.click();await tick();
+  assert.equal(d.activeElement,d.querySelector('#closeQuoteSidebar'));
+  w.closeQuoteSidebar();w.verDetalleProducto(1);await tick();
+  assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),false);assert.equal(variantCalls,1);
+  finishProducts({data:[{...fixture.productos[0],titulo:'Taladro actual',precio:200}],error:null});await tick();
+  w.verDetalleProducto(1);await tick();d.querySelector('.variant-opt-btn').click();d.querySelector('#addToQuoteBtn').click();
+  const [item]=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(item.precio,200);assert.equal(item.variante,'Opción actual');assert.equal(item.qty,4);
+  let opened;w.open=url=>{opened=url};w.generateWhatsAppQuote();
+  assert.match(new URL(opened).searchParams.get('text'),/Opción actual/);
  } finally {dom.window.close()}
 });

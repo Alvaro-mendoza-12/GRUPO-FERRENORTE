@@ -15,6 +15,8 @@ function escapeHTML(value) {
 let productos = [];
 let categorias = [];
 let catalogReady = false;
+let productCatalogState = 'pending';
+let quoteValidationInFlight = false;
 let siteConfigPending = true;
 const DEFAULT_WHATSAPP_NUMBER = '51931137799';
 // Carrito y Selección
@@ -69,7 +71,9 @@ try {
             titulo: item.titulo, variante: typeof item.variante === 'string' ? item.variante : null,
             imagen: typeof item.imagen === 'string' ? item.imagen : 'img/logo.jpeg',
             precio: Number.isFinite(Number(item.precio)) && Number(item.precio) > 0 ? Number(item.precio) : 0,
-            qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty)) || 1))
+            qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty)) || 1)),
+            // La información guardada nunca acredita que siga publicada.
+            validation: 'pending'
         }));
     }
 } catch (e) {
@@ -105,6 +109,12 @@ const REPRESENTATIVE_PRODUCTS = {
 
 // Función para cargar productos desde Supabase
 async function cargarProductos() {
+    if (productCatalogState === 'loading' || quoteValidationInFlight) return;
+    productCatalogState = 'loading';
+    // Un modal y sus respuestas de opciones pertenecen al catálogo anterior.
+    cerrarModalProducto();
+    quoteCart.forEach(item => { item.validation = 'pending'; });
+    renderQuoteItems();
     try {
         const { data, error } = await supabaseClient
             .from('productos')
@@ -113,6 +123,7 @@ async function cargarProductos() {
             .order('orden', { ascending: true });
 
         if (error) throw error;
+        if (!Array.isArray(data)) throw new Error('Respuesta de catálogo inválida');
 
         productos = (data || []).map(p => ({
             id: p.id,
@@ -129,7 +140,16 @@ async function cargarProductos() {
 
         // El catálogo publicado proviene de Supabase; no insertar productos ficticios.
         renderProductos();
+        const categoryView = document.getElementById('categoryDetailView');
+        if (categoryView?.style.display === 'block' && categoryView.dataset.categoryId) {
+            renderCategoryProducts(categoryView.dataset.categoryId);
+        }
+        productCatalogState = 'ready';
+        // Las opciones guardadas no deben retrasar la navegación del catálogo.
+        void revalidateSavedQuote();
     } catch (error) {
+        productCatalogState = 'error';
+        renderQuoteItems();
         console.error('Error cargando productos:', error);
         // Mostrar mensaje amigable al usuario
         const grid = document.getElementById('productsGrid');
@@ -323,6 +343,18 @@ function verDetalleCategoria(id, updateHistory = true) {
     if (titleEl) titleEl.textContent = categoria.titulo;
     if (descEl) descEl.textContent = categoria.descripcion;
 
+    detailView.dataset.categoryId = String(categoria.id);
+    renderCategoryProducts(id);
+
+    // Mostrar sección y subir scroll
+    detailView.style.display = 'block';
+    if (updateHistory && window.location.hash !== `#categoria/${id}`) window.history.pushState(null, '', `#categoria/${id}`);
+    titleEl?.setAttribute('tabindex', '-1');
+    titleEl?.focus({ preventScroll: true });
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function renderCategoryProducts(id) {
     // Filtrar y renderizar productos
     const productosFiltrados = productos.filter(p => p.categoria_id == id);
     const grid = document.getElementById('categoryProductsGrid');
@@ -354,12 +386,6 @@ function verDetalleCategoria(id, updateHistory = true) {
         }
     }
 
-    // Mostrar sección y subir scroll
-    detailView.style.display = 'block';
-    if (updateHistory && window.location.hash !== `#categoria/${id}`) window.history.pushState(null, '', `#categoria/${id}`);
-    titleEl?.setAttribute('tabindex', '-1');
-    titleEl?.focus({ preventScroll: true });
-    window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function mostrarSeccionesPrincipales() {
@@ -442,6 +468,12 @@ function seleccionarCategoria(elemento) {
 // VISTA DETALLE DE PRODUCTO (MODAL)
 // ===========================
 function verDetalleProducto(id) {
+    if (productCatalogState !== 'ready') {
+        alert(productCatalogState === 'error'
+            ? 'No se pudo verificar el catálogo. Reintenta la verificación desde tu cotización.'
+            : 'Estamos actualizando el catálogo. Espera un momento antes de abrir un producto.');
+        return;
+    }
     const producto = productos.find(p => p.id === id);
     document.getElementById('modalQty').value = 1;
     if (!producto) return;
@@ -665,7 +697,82 @@ window.onclick = function (event) {
 // LÓGICA DE COTIZACIÓN (CARRITO)
 // ===========================
 
+function quoteItemDetails(producto, variant = null) {
+    return {
+        id: variant ? `${producto.id}_${variant.id}` : `${producto.id}`,
+        originalId: producto.id,
+        titulo: producto.titulo,
+        variante: variant ? variant.titulo : null,
+        imagen: variant?.imagen_url || producto.imagen || 'img/logo.jpeg',
+        precio: variant && variant.precio > 0 ? variant.precio : producto.precio,
+        validation: 'ready'
+    };
+}
+
+async function revalidateSavedQuote() {
+    quoteValidationInFlight = true;
+    const groups = new Map();
+    for (const item of quoteCart) {
+        if (item.validation !== 'pending') continue;
+        const [productId, variantId] = item.id.split('_');
+        const producto = productos.find(p => String(p.id) === productId);
+        if (!producto) {
+            item.validation = 'product-unavailable';
+        } else if (!variantId) {
+            Object.assign(item, quoteItemDetails(producto));
+        } else {
+            if (!groups.has(producto)) groups.set(producto, []);
+            groups.get(producto).push(item);
+        }
+    }
+    saveQuote();
+    renderQuoteItems();
+    try {
+        await Promise.all([...groups].map(async ([producto, items]) => {
+            try {
+                const {data, error} = await supabaseClient.from('variantes').select('*')
+                    .eq('producto_id', producto.id).eq('activo', true);
+                if (error) throw error;
+                if (!Array.isArray(data)) throw new Error('Respuesta de opciones inválida');
+                for (const item of items) {
+                    // No revivir líneas retiradas ni sobrescribir una selección nueva.
+                    if (!quoteCart.includes(item) || item.validation !== 'pending') continue;
+                    const variant = data.find(v => String(v.id) === item.id.split('_')[1]
+                        && String(v.producto_id) === String(producto.id) && v.activo !== false);
+                    if (variant) Object.assign(item, quoteItemDetails(producto, variant));
+                    else item.validation = 'variant-unavailable';
+                }
+            } catch (error) {
+                console.error('Error verificando opciones guardadas:', error);
+                items.forEach(item => {
+                    if (quoteCart.includes(item) && item.validation === 'pending') item.validation = 'error';
+                });
+            }
+            saveQuote();
+            renderQuoteItems();
+        }));
+    } finally {
+        quoteValidationInFlight = false;
+        renderQuoteItems();
+    }
+}
+
+function quoteValidationMessage() {
+    if (!quoteCart.length) return '';
+    if (productCatalogState === 'error') return 'No se pudo verificar el catálogo. Reintenta la verificación para conservar tu selección y enviar datos actualizados.';
+    if (productCatalogState !== 'ready' || quoteCart.some(item => item.validation === 'pending')) return 'Estamos verificando tu selección con el catálogo actual. Espera antes de enviar.';
+    if (quoteCart.some(item => item.validation === 'error')) return 'No se pudo verificar la selección de opciones. Reintenta la verificación; tu selección se conserva.';
+    if (quoteCart.some(item => item.validation !== 'ready')) return 'Hay selecciones que ya no están disponibles. Retíralas y, si corresponde, elige otra opción antes de enviar.';
+    return '';
+}
+
+function retryQuoteValidation() {
+    if (productCatalogState === 'loading' || quoteValidationInFlight) return;
+    void cargarProductos();
+}
+
 function addToQuote(id, qty = 1, variant = null) {
+    if (productCatalogState !== 'ready') return;
     qty = Math.max(1, Math.min(999, Math.floor(Number(qty)) || 1));
     const producto = productos.find(p => p.id == id);
     if (!producto) return;
@@ -673,14 +780,7 @@ function addToQuote(id, qty = 1, variant = null) {
     // Generar un ID único para la combinación producto-variante
     const cartItemId = variant ? `${id}_${variant.id}` : `${id}`;
 
-    const currentDetails = {
-        id: cartItemId,
-        originalId: id,
-        titulo: producto.titulo,
-        variante: variant ? variant.titulo : null,
-        imagen: variant && variant.imagen_url ? variant.imagen_url : producto.imagen,
-        precio: variant && variant.precio > 0 ? variant.precio : producto.precio
-    };
+    const currentDetails = quoteItemDetails(producto, variant);
     const existing = quoteCart.find(item => item.id == cartItemId);
     if (existing) {
         // Un artículo guardado puede tener un precio o nombre anterior.
@@ -724,7 +824,7 @@ function removeFromQuote(id) {
 }
 
 function saveQuote() {
-    try { localStorage.setItem('ferrenorte_quote', JSON.stringify(quoteCart)); }
+    try { localStorage.setItem('ferrenorte_quote', JSON.stringify(quoteCart.map(({validation, ...item}) => item))); }
     catch (error) { console.warn('La cotización se conservará solo durante esta visita.'); }
 }
 
@@ -736,6 +836,32 @@ function updateCartCount() {
 function renderQuoteItems() {
     const list = document.getElementById('quoteItemsList');
     if (!list) return;
+    const sidebar = document.getElementById('quoteSidebar');
+    const focusedElement = document.activeElement;
+    const hadFocus = sidebar?.classList.contains('active') && sidebar.contains(focusedElement);
+    const focusedItemId = focusedElement?.closest('.quote-item')?.dataset.quoteId;
+    const focusedAction = focusedElement?.dataset.quoteAction;
+    const restoreFocus = () => {
+        if (!hadFocus) return;
+        if (focusedElement.isConnected && !focusedElement.disabled && !focusedElement.hidden) return;
+        const item = [...list.querySelectorAll('.quote-item')].find(row => row.dataset.quoteId === focusedItemId);
+        const replacement = focusedAction && [...(item?.querySelectorAll('[data-quote-action]') || [])]
+            .find(control => control.dataset.quoteAction === focusedAction);
+        (replacement || document.getElementById('closeQuoteSidebar'))?.focus({preventScroll: true});
+    };
+    const validationMessage = quoteValidationMessage();
+    const notice = document.getElementById('quoteValidationNotice');
+    if (notice) {
+        notice.textContent = validationMessage;
+        notice.hidden = !validationMessage;
+    }
+    const sendBtn = document.getElementById('sendQuoteBtn');
+    if (sendBtn) sendBtn.disabled = Boolean(validationMessage);
+    const retryBtn = document.getElementById('retryQuoteValidationBtn');
+    if (retryBtn) {
+        retryBtn.hidden = !quoteCart.length || !(productCatalogState === 'error' || quoteCart.some(item => item.validation === 'error'));
+        retryBtn.disabled = productCatalogState === 'loading' || quoteValidationInFlight;
+    }
 
     if (quoteCart.length === 0) {
         list.innerHTML = `
@@ -745,31 +871,42 @@ function renderQuoteItems() {
             </div>
         `;
         document.getElementById('quoteTotalCount').textContent = "0";
+        restoreFocus();
         return;
     }
 
     list.innerHTML = quoteCart.map(item => `
-        <div class="quote-item">
+        <div class="quote-item" data-quote-id="${escapeHTML(item.id)}">
             <img src="${escapeHTML(item.imagen)}" alt="${escapeHTML(item.titulo)}" class="quote-item-img">
             <div class="quote-item-info">
                 <div class="quote-item-title">${escapeHTML(item.titulo)}</div>
                 ${item.variante ? `<div style="font-size: 11px; color: var(--gray-500); margin-top: -3px; margin-bottom: 5px;">Opción: ${escapeHTML(item.variante)}</div>` : ''}
-                <div class="quote-item-price">${item.precio > 0 ? 'S/ ' + parseFloat(item.precio).toFixed(2) : 'Consultar precio'}</div>
+                <div class="quote-item-price">${item.validation !== 'ready' ? 'Precio no verificado' : item.precio > 0 ? 'S/ ' + parseFloat(item.precio).toFixed(2) : 'Consultar precio'}</div>
+                ${item.validation === 'product-unavailable' ? '<p class="quote-item-warning">Este producto ya no está disponible en el catálogo. Retíralo para continuar.</p>' : ''}
+                ${item.validation === 'variant-unavailable' ? `<p class="quote-item-warning">Esta opción ya no está disponible. Retírala y elige otra opción.</p><button type="button" class="quote-review-options" data-quote-action="review" data-product-id="${escapeHTML(item.id.split('_')[0])}">Ver opciones</button>` : ''}
+                ${item.validation === 'error' ? '<p class="quote-item-warning">No se pudo verificar esta opción. Reintenta la verificación.</p>' : ''}
                 <div class="quote-item-controls">
                     <div class="qty-control">
-                        <button onclick="changeCartQty('${item.id}', -1)">-</button>
-                        <input type="text" class="quote-item-qty-input" value="${item.qty}" readonly>
-                        <button onclick="changeCartQty('${item.id}', 1)">+</button>
+                        <button data-quote-action="decrease" onclick="changeCartQty('${item.id}', -1)">-</button>
+                        <input type="text" class="quote-item-qty-input" data-quote-action="quantity" value="${item.qty}" readonly>
+                        <button data-quote-action="increase" onclick="changeCartQty('${item.id}', 1)">+</button>
                     </div>
                 </div>
             </div>
-            <button class="remove-item-btn" onclick="removeFromQuote('${item.id}')">
+            <button class="remove-item-btn" data-quote-action="remove" aria-label="Retirar ${escapeHTML(item.titulo)}${item.variante ? ' - ' + escapeHTML(item.variante) : ''}" onclick="removeFromQuote('${item.id}')">
                 <i class="fas fa-times"></i>
             </button>
         </div>
     `).join('');
+    list.querySelectorAll('.quote-review-options').forEach(button => {
+        button.onclick = () => {
+            const producto = productos.find(p => String(p.id) === button.dataset.productId);
+            if (producto) verDetalleProducto(producto.id);
+        };
+    });
 
     updateTotalItems();
+    restoreFocus();
 }
 
 function openQuoteSidebar() {
@@ -923,6 +1060,12 @@ function generateWhatsAppQuote() {
         alert("Agrega productos a tu lista antes de generar la cotización.");
         return;
     }
+    const validationMessage = quoteValidationMessage();
+    if (validationMessage) {
+        renderQuoteItems();
+        alert(validationMessage);
+        return;
+    }
 
     let message = `📦 *COTIZACIÓN PROFESIONAL - ${document.title}*\n\n`;
     message += "Hola, un gusto saludarles. 👋\nHe seleccionado los siguientes productos en su catálogo web y deseo solicitar una cotización formal:\n\n";
@@ -980,6 +1123,8 @@ function initCartEvents() {
 
     const sendBtn = document.getElementById('sendQuoteBtn');
     if (sendBtn) sendBtn.onclick = generateWhatsAppQuote;
+    const retryBtn = document.getElementById('retryQuoteValidationBtn');
+    if (retryBtn) retryBtn.onclick = retryQuoteValidation;
 
     const locBtn = document.getElementById('getLocationBtn');
     if (locBtn) locBtn.onclick = getUserLocation;

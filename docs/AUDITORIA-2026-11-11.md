@@ -97,3 +97,13 @@ Se comprobó que `main` y `borrador-principal` siguen en la base `4312f45`, ance
 La revisión encontró una actualización global de WhatsApp heredada en `update-schema-v2.sql`. Se retiró del archivo para que preparar el esquema no sobrescriba contactos existentes; se mantienen los valores iniciales de nuevas configuraciones. No se ejecutó SQL ni se cambiaron datos o políticas reales.
 
 Verificación: 150 pruebas locales aprobadas, sintaxis y build. Una nueva regresión comprueba que el script no actualiza contactos existentes. Esto no autoriza ni certifica ejecutar las migraciones; permisos reales, QA visual y pruebas autenticadas siguen pendientes. La integración se limita a `borrador-principal`, no a `main`.
+
+## Octava iteración: revalidación de cotizaciones guardadas
+
+Se resuelve el pendiente de cotizaciones restauradas descrito en la sexta iteración. Al cargar el catálogo, se actualizan título, precio de referencia e imagen de las selecciones guardadas, consultando las variantes activas por producto cuando corresponde. Se conservan cantidades y selecciones; los artículos retirados permanecen visibles con indicaciones para quitarlos o elegir otra opción.
+
+El envío queda bloqueado mientras faltan verificaciones, hay errores o selecciones retiradas. Un botón permite reintentar sin perder la lista ni duplicar consultas concurrentes. Las respuestas tardías no restauran líneas eliminadas ni sustituyen selecciones nuevas. Los datos se verifican contra la lectura actual del catálogo, no son una garantía de precio/stock futuro ni una reserva.
+
+La integración anterior a `borrador-principal` quedó verificada en `6855290`, igual que la rama de mejoras en ese momento; `main` permaneció en `4312f45`. Este lote debe revisarse y probarse antes de avanzar de nuevo el borrador.
+
+Verificación final de este lote: 168 pruebas locales aprobadas, sintaxis, build y revisión independiente. También se comprobó que el reintento refresca la categoría visible, conserva el foco de la cotización e invalida el diálogo anterior para impedir que una opción antigua sobrescriba datos recién verificados. Pruebas con datos simulados; sin acceso a datos reales ni envío de WhatsApp.

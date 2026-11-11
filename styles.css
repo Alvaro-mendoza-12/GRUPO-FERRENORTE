@@ -2256,6 +2256,30 @@ textarea:focus-visible {
     font-weight: 600;
 }
 
+.quote-validation-notice,
+.quote-item-warning {
+    font-size: 13px;
+    line-height: 1.5;
+    color: #854d0e;
+    margin: 8px 0;
+}
+
+.quote-review-options {
+    color: var(--primary-blue);
+    background: white;
+    border: 1px solid var(--gray-300);
+    border-radius: var(--radius-sm);
+    padding: 8px 12px;
+    margin-bottom: 8px;
+    cursor: pointer;
+}
+
+.send-quote-btn:disabled,
+.quote-review-options:disabled {
+    opacity: 0.65;
+    cursor: not-allowed;
+}
+
 .remove-item-btn {
     background: var(--gray-100);
     border: none;

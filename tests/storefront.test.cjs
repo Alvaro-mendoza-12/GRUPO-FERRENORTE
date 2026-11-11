@@ -13,10 +13,10 @@ function load(names, context) {
   return context;
 }
 function cartContext() {
- return {productos:[{id:1,titulo:'Taladro',precio:100}],quoteCart:[],saveQuote(){},renderQuoteItems(){},updateCartCount(){},openQuoteSidebar(){}};
+ return {productCatalogState:'ready',productos:[{id:1,titulo:'Taladro',precio:100}],quoteCart:[],saveQuote(){},renderQuoteItems(){},updateCartCount(){},openQuoteSidebar(){}};
 }
 test('quote quantities are positive integers capped at 999',()=>{
- const c=load(['addToQuote'],cartContext());
+ const c=load(['quoteItemDetails','addToQuote'],cartContext());
  c.addToQuote(1,-5);assert.equal(c.quoteCart[0].qty,1);
  c.addToQuote(1,10000);assert.equal(c.quoteCart[0].qty,999);
 });
@@ -40,4 +40,10 @@ test('technical sheets reject executable URLs',()=>{
 test('modal quantity increment stops at the same limit as the cart',()=>{
  const input={value:'999'};const c=load(['changeModalQty'],{updateProductWhatsApp(){},document:{getElementById(){return input;}}});
  c.changeModalQty(1);assert.equal(Number(input.value),999);
+});
+
+test('known products cannot be added from an unverified catalog during retry',()=>{
+ const context=cartContext();context.productCatalogState='loading';
+ const c=load(['quoteItemDetails','addToQuote'],context);
+ c.addToQuote(1,2);assert.equal(c.quoteCart.length,0);
 });
