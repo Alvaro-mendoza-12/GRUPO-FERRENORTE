@@ -677,3 +677,75 @@ for (const kind of ['Producto','Categoria']) {
   }finally{dom.window.close()}
  });
 }
+
+function applyAdminStyles(d) {
+ const style=d.createElement('style');style.textContent=fs.readFileSync('admin-styles.css','utf8');d.head.append(style);
+}
+test('storefront can be reached directly from sign-in and every dashboard section',async()=>{
+ const {dom,w,d}=await admin();try{
+ for (const root of ['#loginScreen','.content-header']) {
+  const store=[...d.querySelectorAll(`${root} a`)].find(link=>/Ver tienda/.test(link.textContent));
+  assert.ok(store,`a visible storefront link belongs in ${root}`);
+  assert.equal(new URL(store.href).pathname,'/index.html');
+  assert.equal(store.hasAttribute('data-section'),false,'storefront navigation must not be intercepted as an admin section');
+ }
+ for (const section of ['productos','categorias','configuracion']) {
+  w.switchSection(section);
+  assert.equal(d.querySelector('.content-header a[href="index.html"]').closest('.content-section'),null);
+ }
+ }finally{await settleAdmin();dom.window.close()}
+});
+test('wide catalog tables remain keyboard-reachable named scroll regions',async()=>{
+ const {dom,w,d}=await admin();try{
+ applyAdminStyles(d);
+ for (const section of ['productos','categorias']) {
+  const region=d.querySelector(`#${section}Section .table-container`);
+  assert.equal(region.tabIndex,0,'keyboard users must be able to focus and scroll a wide table');
+  assert.equal(region.getAttribute('role'),'region');
+  assert.ok(region.getAttribute('aria-label'));
+  assert.equal(w.getComputedStyle(region).overflowX,'auto');
+  assert.ok(region.querySelector('caption')?.textContent.trim(),'each table needs an accessible name');
+ }
+ }finally{dom.window.close()}
+});
+test('rendered admin actions and editor controls provide at least 44px targets',async()=>{
+ const {dom,w,d}=await admin();try{
+ applyAdminStyles(d);w.renderProductosTable([hammer]);w.renderCategoriasTable(categoryOptions);w.addVariantRow({titulo:'Acero'});
+ const controls=d.querySelectorAll('button,.nav-item,.form-group input:not([type="hidden"]),.form-group select,.variant-row input:not([type="hidden"]):not([type="file"])');
+ for (const control of controls) {
+  assert.ok(parseFloat(w.getComputedStyle(control).minHeight)>=44,`${control.id||control.className||control.tagName} needs a 44px target`);
+ }
+ assert.notEqual(w.getComputedStyle(d.getElementById('addNewBtn')).width,'100%','the desktop add action must not consume the header');
+ }finally{dom.window.close()}
+});
+test('admin loading feedback stays visible when active and hidden when resolved',async()=>{
+ const {dom,w,d}=await admin(()=>({data:null,error:{message:'offline'}}));try{
+ applyAdminStyles(d);await w.loadProductos();const status=d.getElementById('productosLoadStatus');
+ assert.equal(w.getComputedStyle(status).display,'flex');
+ assert.equal(w.getComputedStyle(d.getElementById('retryProductos')).display,'inline-flex');
+ status.hidden=true;assert.equal(w.getComputedStyle(status).display,'none');
+ }finally{dom.window.close()}
+});
+
+test('category editor title distinguishes editing an existing category from adding one',async()=>{
+ const {dom,w,d}=await admin(req=>({data:req.table==='categorias'?{id:7,titulo:'Herramientas',descripcion:'Catálogo',icon:'fas fa-tools',activo:true}:[],error:null}));
+ try {
+  w.openCategoriaModal(7);
+  await new Promise(resolve=>setTimeout(resolve,5));
+  assert.equal(d.querySelector('#categoriaModalTitle').textContent,'Editar Categoría');
+  w.closeCategoriaModal();w.openCategoriaModal();
+  assert.equal(d.querySelector('#categoriaModalTitle').textContent,'Agregar Categoría');
+ } finally {dom.window.close()}
+});
+
+test('add action is hidden in configuration and restored in catalog sections',async()=>{
+ const {dom,w,d}=await admin();try{
+ applyAdminStyles(d);
+ w.switchSection('configuracion');await settleAdmin();
+ assert.equal(w.getComputedStyle(d.getElementById('addNewBtn')).display,'none');
+ for(const section of ['categorias','productos']) {
+  w.switchSection(section);await settleAdmin();
+  assert.notEqual(w.getComputedStyle(d.getElementById('addNewBtn')).display,'none');
+ }
+ }finally{dom.window.close()}
+});

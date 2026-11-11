@@ -26,3 +26,5 @@ dist/
 # Local visual QA fixtures and captures; never production assets.
 qa-preview.html
 qa-screenshots/review/
+
+qa-admin-preview.html

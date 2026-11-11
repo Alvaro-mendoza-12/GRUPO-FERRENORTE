@@ -279,6 +279,7 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
 function switchSection(section) {
     adminSectionVersion++;
     currentSection = section;
+    document.getElementById('addNewBtn').hidden = section === 'configuracion';
 
     // Actualizar navegación activa
     document.querySelectorAll('.nav-item[data-section]').forEach(item => {
@@ -1027,7 +1028,7 @@ function openCategoriaModal(categoriaId = null) {
     document.getElementById('categoriaId').value = '';
     document.getElementById('categoriaImagenesUrls').value = '';
     document.getElementById('categoriaImagenesPreview').innerHTML = '';
-    document.getElementById('categoriaModalTitle').textContent = 'Agregar Categoría';
+    document.getElementById('categoriaModalTitle').textContent = categoriaId ? 'Editar Categoría' : 'Agregar Categoría';
     if (categoriaId) loadCategoriaData(categoriaId);
     showAdminDialog(modal, 'categoriaTitulo');
 }

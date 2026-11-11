@@ -286,22 +286,19 @@ function renderCategorias() {
         return;
     }
 
-    grid.innerHTML = categorias.map((categoria, index) => `
+    grid.innerHTML = categorias.map(categoria => `
         <div class="category-card ${categoria.inicialmenteActiva ? 'active' : ''}" onclick="verDetalleCategoria(${categoria.id})" style="cursor: pointer;">
             ${categoria.badge ? `<div class="featured-badge">${escapeHTML(categoria.badge)}</div>` : ''}
             <div class="category-header">
-                <div class="category-icon">
+                <div class="category-icon" aria-hidden="true">
                     <i class="${escapeHTML(categoria.icon)}"></i>
                 </div>
                 <h3 class="category-title">${escapeHTML(categoria.titulo)}</h3>
             </div>
-            <div class="category-gallery">
-                ${categoria.imagenes.map(img => `<img src="${escapeHTML(img)}" alt="Galería ${escapeHTML(categoria.titulo)}" class="gallery-img" loading="lazy">`).join('')}
-            </div>
             <p class="category-description">
                 ${escapeHTML(categoria.descripcion)}
             </p>
-            <button class="category-btn" onclick="event.stopPropagation(); verDetalleCategoria(${categoria.id})">Ver Productos <i class="fas fa-chevron-right"></i></button>
+            <button class="category-btn" aria-label="Ver productos de ${escapeHTML(categoria.titulo)}" onclick="event.stopPropagation(); verDetalleCategoria(${categoria.id})"><i class="fas fa-arrow-right" aria-hidden="true"></i></button>
         </div>
     `).join('');
 }

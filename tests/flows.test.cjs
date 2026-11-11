@@ -514,3 +514,89 @@ test('product photos cannot contribute their intrinsic height to card sizing',as
  assert.equal(w.getComputedStyle(photo).objectFit,'contain');
  }finally{dom.window.close()}
 });
+
+// jsdom does not evaluate viewport media queries. Apply the real stylesheet's
+// matching width rules in source order so responsive contracts remain testable.
+function applyStylesAtWidth(d,width){
+ const source=d.createElement('style');source.textContent=fs.readFileSync('styles.css','utf8');d.head.append(source);
+ function matchingRules(rules){
+  return [...rules].flatMap(rule=>{
+   if(!rule.media)return [rule.cssText];
+   const query=rule.media.mediaText;
+   if(!/width/.test(query))return [];
+   const constraints=[...query.matchAll(/(min|max)-width:\s*(\d+)px/g)];
+   return constraints.every(([,bound,value])=>bound==='min'?width>=Number(value):width<=Number(value))?matchingRules(rule.cssRules):[];
+  });
+ }
+ const effective=matchingRules(source.sheet.cssRules).join('\n');source.remove();
+ const style=d.createElement('style');style.textContent=effective;d.head.append(style);
+ return style;
+}
+
+test('category browsing precedes the full catalog without inventing extra categories',async()=>{
+ const {dom,w,d}=await app();try{
+  const categories=d.querySelector('#categorias');const catalog=d.querySelector('#productos');
+  assert.ok(categories.compareDocumentPosition(catalog)&w.Node.DOCUMENT_POSITION_FOLLOWING,'Category shortcuts should come before all products');
+  assert.equal(categories.querySelectorAll('.category-card').length,1);
+  const trigger=categories.querySelector('.category-btn');
+  trigger.addEventListener('click',new w.Function('event',trigger.getAttribute('onclick')));
+  trigger.click();
+  assert.equal(d.querySelector('#categoryDetailTitle').textContent,'Herramientas');
+  assert.equal(d.querySelectorAll('#categoryProductsGrid .product-card').length,2);
+ }finally{dom.window.close()}
+});
+
+test('the quote guide follows browsing so it does not displace the mobile catalog',async()=>{
+ const {dom,w,d}=await app();try{
+  const catalog=d.querySelector('#productos');const guide=d.querySelector('.service-strip');
+  assert.ok(catalog.compareDocumentPosition(guide)&w.Node.DOCUMENT_POSITION_FOLLOWING,'Products should be reachable before the full quote instructions');
+  w.verDetalleCategoria(1);assert.equal(guide.style.display,'none');
+  w.volverAlInicio();assert.equal(guide.style.display,'');
+ }finally{dom.window.close()}
+});
+
+test('category shortcuts use their published icon instead of repeating product photos',async()=>{
+ const {dom,d}=await app({categoria_imagenes:[{imagen_url:'first.jpg'},{imagen_url:'second.jpg'}]});try{
+  const category=d.querySelector('.category-card');
+  assert.equal(category.querySelectorAll('img').length,0,'The category shortcut must not repeat the product gallery');
+  assert.ok(category.querySelector('.category-icon .fa-tools'));
+  assert.match(category.querySelector('.category-btn').getAttribute('aria-label'),/Herramientas/);
+  assert.match(category.textContent,/Para tu proyecto/);
+ }finally{dom.window.close()}
+});
+
+test('catalog cards reserve generous columns rather than five cramped desktop columns',async()=>{
+ const {dom,w,d}=await app();try{
+  for(const [width,columns] of [[390,2],[768,2],[1180,3],[1280,3],[1440,4]]){
+   const style=applyStylesAtWidth(d,width);
+   assert.equal(w.getComputedStyle(d.querySelector('#productsGrid')).gridTemplateColumns,`repeat(${columns}, minmax(0, 1fr))`,`${width}px viewport`);
+   style.remove();
+  }
+ }finally{dom.window.close()}
+});
+
+test('catalog titles, prices and actions stay readable and touchable at desktop and mobile widths',async()=>{
+ const {dom,w,d}=await app();try{
+  w.verDetalleCategoria(1);
+  for(const [width,minTitle,minPrice] of [[1180,15,22],[390,14,22],[320,14,22]]){
+   const style=applyStylesAtWidth(d,width);
+   for(const title of d.querySelectorAll('.product-title'))assert.ok(parseFloat(w.getComputedStyle(title).fontSize)>=minTitle,`Readable product title at ${width}px`);
+   for(const price of d.querySelectorAll('.price-main'))assert.ok(parseFloat(w.getComputedStyle(price).fontSize)>=minPrice,`Readable price at ${width}px`);
+   for(const action of d.querySelectorAll('.btn-add-pill,.product-link,.btn-quote-small,.category-btn'))assert.ok(parseFloat(w.getComputedStyle(action).minHeight)>=44,`44px ${action.className} at ${width}px`);
+   for(const text of d.querySelectorAll('.hero-description,.section-subtitle,.category-description,.product-description'))assert.ok(parseFloat(w.getComputedStyle(text).fontSize)>=14,`Readable ${text.className} at ${width}px`);
+   style.remove();
+  }
+ }finally{dom.window.close()}
+});
+
+test('mobile floating shortcuts cannot cover products while contact and quote controls remain available',async()=>{
+ const {dom,w,d}=await app();try{
+  for(const width of [320,390,560,768]){
+   const style=applyStylesAtWidth(d,width);
+   for(const control of d.querySelectorAll('.whatsapp-float,.scroll-top'))assert.equal(w.getComputedStyle(control).display,'none',`${control.className} at ${width}px`);
+   assert.notEqual(w.getComputedStyle(d.querySelector('#cartToggleBtn')).display,'none');
+   assert.notEqual(w.getComputedStyle(d.querySelector('.contact-whatsapp')).display,'none');
+   style.remove();
+  }
+ }finally{dom.window.close()}
+});

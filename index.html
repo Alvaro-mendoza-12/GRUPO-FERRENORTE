@@ -20,8 +20,7 @@
     <meta property="og:description"
         content="Herramientas, productos ferreteros y mobiliario para tu negocio. Explora el catálogo y solicita una cotización.">
     <meta property="og:image" content="img/logo.jpeg">
-    <meta property="og:url" content="https://grupo-ferrenorte.web.app/">
-    <!-- Reemplazar con tu URL final si es distinta -->
+    <!-- Añadir og:url solo cuando se confirme el dominio de producción. -->
     <meta property="og:site_name" content="GRUPO FERRENORTE">
 
     <!-- Twitter Cards -->
@@ -115,11 +114,17 @@
         </div>
     </section>
 
-    <section class="service-strip" aria-label="Cómo cotizar">
-        <div class="container service-grid">
-            <div><span>01</span><p><strong>Explora el catálogo</strong>Encuentra productos para tu negocio.</p></div>
-            <div><span>02</span><p><strong>Prepara tu lista</strong>Elige opciones y cantidades.</p></div>
-            <div><span>03</span><p><strong>Cotiza por WhatsApp</strong>Consulta precio, disponibilidad y entrega.</p></div>
+    <!-- Categories: a quick way into the published catalog -->
+    <section class="categories-section" id="categorias">
+        <div class="container">
+            <div class="section-header">
+                <h2 class="section-title">Explora por categoría</h2>
+                <p class="section-subtitle">Encuentra la línea de productos que necesitas.</p>
+            </div>
+
+            <div class="categories-grid" id="categoriesGrid">
+                <!-- Las categorías se cargarán dinámicamente desde script.js -->
+            </div>
         </div>
     </section>
 
@@ -160,17 +165,11 @@
         </div>
     </section>
 
-    <!-- Categories Section -->
-    <section class="categories-section" id="categorias">
-        <div class="container">
-            <div class="section-header">
-                <h2 class="section-title">Explora por categoría</h2>
-                <p class="section-subtitle">Encuentra la línea de productos que necesitas.</p>
-            </div>
-
-            <div class="categories-grid" id="categoriesGrid">
-                <!-- Las categorías se cargarán dinámicamente desde script.js -->
-            </div>
+    <section class="service-strip" aria-label="Cómo cotizar">
+        <div class="container service-grid">
+            <div><span>01</span><p><strong>Explora el catálogo</strong>Encuentra productos para tu negocio.</p></div>
+            <div><span>02</span><p><strong>Prepara tu lista</strong>Elige opciones y cantidades.</p></div>
+            <div><span>03</span><p><strong>Cotiza por WhatsApp</strong>Consulta precio, disponibilidad y entrega.</p></div>
         </div>
     </section>
 

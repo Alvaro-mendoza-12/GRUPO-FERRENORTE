@@ -44,3 +44,19 @@ El trabajo se entrega en GitHub. Vercel fue retirado del alcance. No integrar es
 - Evidencia visual generada localmente con rótulo de datos simulados y entregable por separado; no se incorpora el fixture al catálogo real.
 
 Queda pendiente validar con datos publicados reales y, si se requiere certificación, con dispositivos/tecnologías de asistencia reales. La mejora de apariencia no se presenta como una garantía de ventas.
+
+## Refinamiento con referencia aportada por el usuario
+
+El usuario aportó https://leytech-ochre.vercel.app/ y pidió mejorar tamaños y jerarquía tanto en tienda como en administración. Se inspeccionaron esa página y `/catalogo` en navegador real, sin acceder a su administración ni copiar marca, catálogo, pagos o promociones.
+
+Cambios aplicados a Ferrenorte:
+
+- Categorías reales antes del catálogo, en accesos compactos con icono/descripción, sin repetir galerías de fotos.
+- Tres columnas de producto en escritorio medio; cuatro solo desde 1440 px, dos hasta 800 px. Nombres/precios y textos de lectura con mayor presencia.
+- Guía de cotización después de los productos para no retrasar el catálogo en móvil.
+- Controles flotantes ocultos en móvil, donde contacto y cotización siguen accesibles por la navegación.
+- Panel integrado alineado con la misma identidad: login sobrio, navegación independiente, enlace permanente a la tienda, tablas desplazables y formularios legibles. No se añaden estadísticas ficticias ni nuevas facultades administrativas.
+
+La tienda se verificó de nuevo en navegador real: categorías y vuelta, búsqueda, variante, cantidad, cotización interceptada y Escape. Tres columnas a 1180 px y dos en marcos de 390/768 px, sin desbordamiento horizontal. No se desplegó ni se validó el backend real. La comprobación pública del proyecto Supabase desde este entorno devolvió error 503 de conexión upstream: requiere verificación independiente antes de afirmar operación productiva.
+
+Administración verificada en navegador real con sesión/datos simulados y escrituras desactivadas: escritorio y marcos de 390/768 px, tablas desplazables sin ensanchar el documento, menú móvil, login, formularios y cierre/foco de diálogos. Se corrigió el título de edición de categorías y se oculta la acción de alta en Configuración. Suite final: 201 pruebas aprobadas. Las capturas llevan rótulos de prueba; los fixtures quedan fuera del build y de Git.

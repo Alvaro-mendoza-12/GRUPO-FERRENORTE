@@ -121,3 +121,11 @@ Los selectores de categoría ahora muestran carga/error y permiten reintentar; a
 Los listados retiran las acciones de filas anteriores al recargar o fallar y descartan respuestas obsoletas, incluidos cambios de sección. El reintento conserva el filtro; el título y los resultados ya no representan consultas distintas. Se retiró el aviso que recomendaba ejecutar SQL sin una revisión del esquema.
 
 Verificación del lote: 189 pruebas locales aprobadas y revisión independiente de carreras/reintentos, sin bloqueadores. No se modificaron políticas, SQL ni datos reales. Auditoría npm: cero vulnerabilidades reportadas; no cubre CDN ni permisos reales. El rediseño sigue sin integrarse al borrador mientras se revisa la referencia visual del usuario.
+
+## Refinamiento de tienda y administración con referencia Leytech
+
+Se priorizó el catálogo: categorías compactas antes de productos, tipografía mayor y tres columnas en escritorio medio. El panel integrado comparte la identidad visual, mantiene controles de 44 px y permite desplazar tablas dentro de regiones accesibles. Se corrigieron el título del editor de categorías y el botón de alta que no correspondía a Configuración.
+
+Verificación: 201 pruebas locales aprobadas, sintaxis, build y revisión independiente. Navegador real con datos/sesión simulados, escrituras desactivadas y WhatsApp interceptado: tienda en escritorio y marcos de 390/768 px; panel en escritorio y marcos de 390/768 px, sin desbordamiento del documento. Menú, navegación, formularios y cierre/foco de diálogos comprobados. No equivale a una prueba autenticada del backend ni a certificación en dispositivos reales.
+
+README de producción corregido para retirar afirmaciones no demostradas. GitHub informa Pages habilitado, pero rama/dominio de publicación no se han verificado; se retiró una URL Firebase heredada de metadatos no respaldada por configuración. La comprobación pública de Supabase devuelve 503 upstream desde el entorno: autenticación, RLS, storage y CRUD reales siguen pendientes. No se cambian políticas ni datos reales y no se despliega. Este lote permanece en la rama de trabajo, sin integrar el rediseño automáticamente al borrador.
