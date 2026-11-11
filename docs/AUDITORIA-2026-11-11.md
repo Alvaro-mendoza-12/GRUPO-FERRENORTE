@@ -89,3 +89,11 @@ El usuario retiró el objetivo de despliegue Vercel. Los pendientes históricos 
 Los editores de productos y categorías ahora incluyen nombre y rol de diálogo, foco inicial y restauración, navegación Tab/Shift+Tab confinada y estados ocultos coherentes. Escape reutiliza el bloqueo de cierre durante un guardado. Tras refrescar la tabla, el foco tiene una alternativa si el botón original desapareció.
 
 Verificación acumulada: 149 pruebas locales aprobadas, sintaxis y build, con 16 regresiones nuevas del panel. Esta verificación DOM no certifica el resultado visual ni el uso con lector de pantalla. La comparación estática con el panel separado y el plan de integración están en `COMPARACION-ADMIN-E-INTEGRACION.md`.
+
+## Revisión previa de integración al borrador
+
+Se comprobó que `main` y `borrador-principal` siguen en la base `4312f45`, ancestro de la rama de mejoras. No hay divergencia de contenido que resolver en esa base; la integración candidata permite avance directo. La rama `mejoras` de Óscar sigue sin aparecer, por lo que no se considera revisada ni integrada.
+
+La revisión encontró una actualización global de WhatsApp heredada en `update-schema-v2.sql`. Se retiró del archivo para que preparar el esquema no sobrescriba contactos existentes; se mantienen los valores iniciales de nuevas configuraciones. No se ejecutó SQL ni se cambiaron datos o políticas reales.
+
+Verificación: 150 pruebas locales aprobadas, sintaxis y build. Una nueva regresión comprueba que el script no actualiza contactos existentes. Esto no autoriza ni certifica ejecutar las migraciones; permisos reales, QA visual y pruebas autenticadas siguen pendientes. La integración se limita a `borrador-principal`, no a `main`.

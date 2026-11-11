@@ -24,10 +24,8 @@ INSERT INTO configuracion (logo_url, nombre_sitio, descripcion_sitio, contacto_w
 SELECT 'img/logo.jpeg', 'GRUPO FERRENORTE RO&MY E.I.R.L', 'Expertos en herramientas profesionales, EPP y equipamiento comercial.', '51931137799'
 WHERE NOT EXISTS (SELECT 1 FROM configuracion);
 
--- Actualizar el número de WhatsApp de la configuración existente
-UPDATE configuracion
-SET contacto_whatsapp = '51931137799'
-WHERE contacto_whatsapp IS DISTINCT FROM '51931137799';
+-- Conservar el contacto de configuraciones existentes.
+-- Los cambios de contacto se realizan explícitamente desde el panel, no al preparar el esquema.
 
 -- 4. Habilitar RLS en configuracion
 ALTER TABLE configuracion ENABLE ROW LEVEL SECURITY;
