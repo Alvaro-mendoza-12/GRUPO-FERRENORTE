@@ -3,12 +3,48 @@ function escapeAdminHTML(value) {
     return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
 }
 
+// A transport failure after INSERT may mean the server committed the row.
+// Never silently repeat that operation without reconciling the catalog first.
+function confirmInsertedRecord(result) {
+    const code = result?.error?.code;
+    // Only recognized server rejections establish that this INSERT did not commit.
+    const definiteRejection = typeof code === 'string' && (
+        /^(22|23|28|42)[0-9A-Z]{3}$/.test(code) ||
+        /^(40001|40P01|PGRST100|PGRST102|PGRST202|PGRST204|PGRST301|PGRST302|PGRST303)$/.test(code)
+    );
+    if (definiteRejection) throw result.error;
+    if (result?.error || !result?.data?.id) {
+        const error = new Error('No se pudo confirmar el guardado. Puede haberse registrado. Revisa el catálogo y vuelve a abrir el registro antes de reintentar.');
+        error.uncertainWrite = true;
+        throw error;
+    }
+    return result.data;
+}
+
+async function awaitConfirmedInsert(query) {
+    let result;
+    try {
+        result = await query;
+    } catch (error) {
+        // A rejected promise is transport evidence, not a confirmed SQL response.
+        return confirmInsertedRecord({ error: { message: 'Respuesta de transporte no confirmada' } });
+    }
+    return confirmInsertedRecord(result);
+}
+
 // ===========================
 // VARIABLES GLOBALES
 // ===========================
 let pendingAdminOperations = 0;
 let currentUser = null;
 let currentSection = 'productos';
+let productWriteUncertain = false;
+let categoryWriteUncertain = false;
+let configWriteUncertain = false;
+let configSaveInProgress = false;
+let categoryEditorVersion = 0;
+let categoryReady = false;
+let categorySaveInProgress = false;
 let productEditorVersion = 0;
 let loadedVariantIds = [];
 let variantsReady = false;
@@ -481,7 +517,9 @@ function renderProductosTable(productos) {
 }
 
 function openProductoModal(productoId = null) {
+    if (productSaveInProgress) return;
     productEditorVersion++;
+    productWriteUncertain = false;
     loadedVariantIds = [];
     variantsReady = !productoId;
     const modal = document.getElementById('productoModal');
@@ -509,6 +547,7 @@ function openProductoModal(productoId = null) {
 }
 
 function closeProductoModal() {
+    if (productSaveInProgress) return;
     productEditorVersion++;
     document.getElementById('productoModal').classList.remove('active');
 }
@@ -637,6 +676,7 @@ async function deleteProducto(id, titulo) {
 document.getElementById('productoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (productSaveInProgress) return;
+    if (productWriteUncertain) { alert('Comprueba el catálogo y vuelve a abrir el registro antes de reintentar un guardado sin confirmar.'); return; }
     if (!variantsReady) { alert('No se cargaron las variantes. Vuelve a abrir el producto antes de guardar.'); return; }
     const id = document.getElementById('productoId').value;
     const imagenFile = document.getElementById('productoImagen').files[0];
@@ -645,6 +685,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     if (!imagenFile && !imagenUrl) { alert('Imagen requerida'); return; }
 
     productSaveInProgress = true;
+    document.getElementById('productoForm').inert = true;
     showLoading();
     try {
         if (imagenFile) imagenUrl = await uploadImage(imagenFile, 'productos');
@@ -675,23 +716,26 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
             if (updateError) throw updateError;
             await saveVariantes(id);
         } else {
-            const { data: newProd, error: insertError } = await supabaseClient.from('productos').insert([producto]).select().single();
-            if (insertError) throw insertError;
+            const newProd = await awaitConfirmedInsert(supabaseClient.from('productos').insert([producto]).select('id').single());
             document.getElementById('productoId').value = newProd.id;
             await saveVariantes(newProd.id);
         }
 
+        productSaveInProgress = false;
         closeProductoModal();
         await loadProductos(currentCategoryFilter);
     } catch (error) {
+        if (error.uncertainWrite) productWriteUncertain = true;
         console.error('Error guardando:', error);
         alert('Error: ' + error.message);
     }
     productSaveInProgress = false;
+    document.getElementById('productoForm').inert = false;
     hideLoading();
 });
 
 async function saveVariantes(productoId) {
+    if (productWriteUncertain) throw new Error('Revisa el catálogo y vuelve a abrir el producto antes de reintentar.');
     if (!variantsReady) throw new Error('No se cargaron las variantes. Cierra y vuelve a abrir el producto antes de guardar.');
     const rows = [...document.querySelectorAll('.variant-row')];
     const prepared = [];
@@ -720,9 +764,13 @@ async function saveVariantes(productoId) {
             if (error) throw error;
             retainedIds.add(id);
         } else {
-            const { data, error } = await supabaseClient.from('variantes').insert([payload]).select('id').single();
-            if (error) throw error;
-            if (!data?.id) throw new Error('No se pudo confirmar la variante guardada.');
+            let data;
+            try {
+                data = await awaitConfirmedInsert(supabaseClient.from('variantes').insert([payload]).select('id').single());
+            } catch (error) {
+                if (error.uncertainWrite) productWriteUncertain = true;
+                throw error;
+            }
             row.dataset.id = String(data.id);
             loadedVariantIds.push(String(data.id));
             retainedIds.add(String(data.id));
@@ -793,6 +841,10 @@ function renderCategoriasTable(categorias) {
 }
 
 function openCategoriaModal(categoriaId = null) {
+    if (categorySaveInProgress) return;
+    categoryEditorVersion++;
+    categoryWriteUncertain = false;
+    categoryReady = !categoriaId;
     const modal = document.getElementById('categoriaModal');
     const form = document.getElementById('categoriaForm');
     form.reset();
@@ -804,13 +856,22 @@ function openCategoriaModal(categoriaId = null) {
     modal.classList.add('active');
 }
 
-function closeCategoriaModal() { document.getElementById('categoriaModal').classList.remove('active'); }
+function closeCategoriaModal() {
+    if (categorySaveInProgress) return;
+    categoryEditorVersion++;
+    categoryReady = false;
+    document.getElementById('categoriaModal').classList.remove('active');
+}
 
-async function loadCategoriaData(id) {
+async function loadCategoriaData(id, version = categoryEditorVersion) {
+    categoryReady = false;
     showLoading();
     try {
-        const { data } = await supabaseClient.from('categorias').select('*').eq('id', id).single();
-        const { data: imgs } = await supabaseClient.from('categoria_imagenes').select('imagen_url').eq('categoria_id', id).order('orden');
+        const { data, error } = await supabaseClient.from('categorias').select('*').eq('id', id).single();
+        if (error) throw error;
+        const { data: imgs, error: imageError } = await supabaseClient.from('categoria_imagenes').select('imagen_url').eq('categoria_id', id).order('orden');
+        if (imageError) throw imageError;
+        if (version !== categoryEditorVersion) return;
 
         document.getElementById('categoriaId').value = data.id;
         document.getElementById('categoriaTitulo').value = data.titulo;
@@ -824,8 +885,12 @@ async function loadCategoriaData(id) {
         const preview = document.getElementById('categoriaImagenesPreview');
         preview.innerHTML = imgs.map(i => `<div class="preview-item"><img src="${escapeAdminHTML(i.imagen_url)}"></div>`).join('');
 
-    } catch (e) { console.error(e); }
-    hideLoading();
+        categoryReady = true;
+    } catch (e) {
+        if (version === categoryEditorVersion) alert('No se pudo cargar la categoría. Cierra y vuelve a abrir el editor.');
+    } finally {
+        hideLoading();
+    }
 }
 
 async function editCategoria(id) { openCategoriaModal(id); }
@@ -844,6 +909,9 @@ async function deleteCategoria(id, title) {
 
 document.getElementById('categoriaForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (categorySaveInProgress) return;
+    if (categoryWriteUncertain) { alert('Comprueba las categorías y vuelve a abrir el registro antes de reintentar un guardado sin confirmar.'); return; }
+    if (!categoryReady) { alert('No se cargó la categoría. Vuelve a abrir el editor antes de guardar.'); return; }
     const id = document.getElementById('categoriaId').value;
     const cat = {
         titulo: document.getElementById('categoriaTitulo').value,
@@ -859,6 +927,8 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
     if (files.length === 0 && !existing) { alert('Sube 4 imágenes'); return; }
     if (files.length > 0 && files.length !== 4) { alert('Deben ser 4 imágenes'); return; }
 
+    categorySaveInProgress = true;
+    document.getElementById('categoriaForm').inert = true;
     showLoading();
     try {
         let urls = [];
@@ -873,21 +943,28 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
             const { error } = await supabaseClient.from('categorias').update(cat).eq('id', id);
             if (error) throw error;
         } else {
-            const { data, error } = await supabaseClient.from('categorias').insert([cat]).select().single();
-            if (error) throw error;
+            const data = await awaitConfirmedInsert(supabaseClient.from('categorias').insert([cat]).select('id').single());
             catId = data.id;
             document.getElementById('categoriaId').value = catId;
         }
 
         if (!id || files.length > 0) await saveCategoryImages(catId, urls);
 
+        categorySaveInProgress = false;
         closeCategoriaModal();
         alert('Categoría guardada');
         await loadCategorias();
         // Recargar el select de categorías también por si cambió algo
         await loadCategoriasSelect();
-    } catch (e) { console.error(e); alert('Error: ' + e.message); }
-    hideLoading();
+    } catch (e) {
+        if (e.uncertainWrite) categoryWriteUncertain = true;
+        console.error(e); alert('Error: ' + e.message);
+    }
+    finally {
+        categorySaveInProgress = false;
+        document.getElementById('categoriaForm').inert = false;
+        hideLoading();
+    }
 });
 
 // Preserve image rows during replacement; never erase the gallery before writes succeed.
@@ -897,11 +974,12 @@ async function saveCategoryImages(categoryId, urls) {
     const previous = data || [];
     for (let index = 0; index < urls.length; index++) {
         const payload = { categoria_id: categoryId, imagen_url: urls[index], orden: index + 1 };
-        const query = previous[index]
-            ? supabaseClient.from('categoria_imagenes').update(payload).eq('id', previous[index].id).eq('categoria_id', categoryId)
-            : supabaseClient.from('categoria_imagenes').insert([payload]);
-        const { error: writeError } = await query;
-        if (writeError) throw writeError;
+        if (previous[index]) {
+            const { error: writeError } = await supabaseClient.from('categoria_imagenes').update(payload).eq('id', previous[index].id).eq('categoria_id', categoryId);
+            if (writeError) throw writeError;
+        } else {
+            await awaitConfirmedInsert(supabaseClient.from('categoria_imagenes').insert([payload]).select('id').single());
+        }
     }
     for (const image of previous.slice(urls.length)) {
         const { error: deleteError } = await supabaseClient.from('categoria_imagenes').delete().eq('id', image.id).eq('categoria_id', categoryId);
@@ -952,6 +1030,9 @@ async function loadConfiguracion() {
 
 document.getElementById('configForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (configSaveInProgress) return;
+    if (configWriteUncertain) { alert('Actualiza la página y comprueba la configuración antes de reintentar un guardado sin confirmar.'); return; }
+    configSaveInProgress = true;
     showLoading();
     try {
         const id = document.getElementById('configId').value;
@@ -973,17 +1054,20 @@ document.getElementById('configForm').addEventListener('submit', async (e) => {
             const { error } = await supabaseClient.from('configuracion').update(config).eq('id', id);
             if (error) throw error;
         } else {
-            const { error } = await supabaseClient.from('configuracion').insert([config]);
-            if (error) throw error;
+            const data = await awaitConfirmedInsert(supabaseClient.from('configuracion').insert([config]).select('id').single());
+            document.getElementById('configId').value = data.id;
         }
 
         alert('Configuración guardada correctamente.');
 
     } catch (error) {
+        if (error.uncertainWrite) configWriteUncertain = true;
         console.error('Error saving config:', error);
-        alert('Error al guardar configuración.');
+        alert('Error al guardar configuración. ' + (error.uncertainWrite ? error.message : 'Revisa la conexión y los permisos.'));
+    } finally {
+        configSaveInProgress = false;
+        hideLoading();
     }
-    hideLoading();
 });
 
 // Logo Preview

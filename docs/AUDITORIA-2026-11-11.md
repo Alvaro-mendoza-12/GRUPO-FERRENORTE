@@ -39,3 +39,14 @@ Identificar primero equipo y proyecto correcto. Importar esta rama o desplegar p
 **Límite importante:** estas operaciones de varias filas no son una transacción. Un fallo puede dejar cambios parciales; la interfaz conserva el editor y muestra el error. Si se pierde la respuesta de una inserción ya aceptada por el servidor, conviene recargar y comprobar antes de reintentar. Una solución atómica/idempotente necesita una operación transaccional del backend y revisión específica, no cambios automáticos de políticas.
 
 Verificación local acumulada: 29 pruebas DOM/unitarias, sintaxis y build. Todas usan datos simulados y no sustituyen pruebas visuales o autenticadas.
+
+## Tercera iteración: concurrencia y respuestas inciertas
+- Los editores bloquean cambios de registro durante el guardado; categorías ignoran respuestas antiguas y no permiten guardar si la carga falló.
+- Se evitan envíos simultáneos de categorías y configuración.
+- Una inserción solo se considera confirmada cuando devuelve un ID. Ante un resultado de transporte incierto se bloquea el reintento en ese editor y se pide comprobar el catálogo antes de reabrirlo; no se supone que el servidor rechazó la escritura.
+- La configuración conserva su ID confirmado, de modo que un segundo guardado actualiza el registro en vez de crear otro.
+- El build limpia exclusivamente su carpeta generada `dist/` antes de copiar la lista de activos públicos, evitando que se publiquen restos de una compilación anterior.
+
+Verificación acumulada: 37 pruebas aprobadas, comprobación sintáctica y build. La suite usa Supabase simulado; no certifica transacciones ni permisos en producción. No se añadieron migraciones ni se cambiaron políticas reales.
+
+QA visual adicional: el servidor anunció escucha en 8766, pero tanto una comprobación HTTP independiente como el navegador recibieron conexión rechazada. El acceso al servidor entre superficies sigue pendiente; no se han aprobado capturas de escritorio o móvil. Para un preview Vercel falta conectar la cuenta e identificar proyecto y equipo.

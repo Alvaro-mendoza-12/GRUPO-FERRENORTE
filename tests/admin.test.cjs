@@ -77,14 +77,14 @@ test('failed variant image upload stops before database changes',async()=>{
 });
 test('failed category update stops before altering its images',async()=>{
  const {dom,w,d,calls,alerts}=await admin(()=>({data:null,error:{message:'update failed'}}));try{
- d.querySelector('#categoriaId').value='1';d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
+ w.openCategoriaModal();d.querySelector('#categoriaId').value='1';d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
  d.querySelector('#categoriaForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
  assert.equal(calls.filter(x=>x.table==='categoria_imagenes').length,0);assert.equal(alerts.includes('Categoría guardada'),false);
  }finally{dom.window.close()}
 });
 test('editing category text preserves unchanged image records',async()=>{
  const {dom,w,d,calls}=await admin(()=>({data:[],error:null}));try{
- d.querySelector('#categoriaId').value='1';d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
+ w.openCategoriaModal();d.querySelector('#categoriaId').value='1';d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
  d.querySelector('#categoriaForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
  assert.equal(calls.filter(x=>x.table==='categoria_imagenes'&&x.action!=='select').length,0);
  }finally{dom.window.close()}
@@ -103,7 +103,7 @@ test('discarded product responses release their loading operation',async()=>{
  }finally{dom.window.close()}
 });
 test('confirmed partial inserts remain removable when a later variant fails',async()=>{
- let fail=true;const {dom,w,d,calls}=await admin(req=>req.action==='insert'?(req.payload[0].titulo==='B'&&fail?{data:null,error:{message:'failed'}}:{data:{id:30},error:null}):{data:[],error:null});try{
+ let fail=true;const {dom,w,d,calls}=await admin(req=>req.action==='insert'?(req.payload[0].titulo==='B'&&fail?{data:null,error:{code:'42501',message:'failed'}}:{data:{id:30},error:null}):{data:[],error:null});try{
  w.openProductoModal();w.addVariantRow({titulo:'A'});w.addVariantRow({titulo:'B'});await assert.rejects(()=>w.saveVariantes(1));
  d.querySelectorAll('.variant-row').forEach(row=>row.remove());fail=false;await w.saveVariantes(1);
  assert.ok(calls.some(req=>req.action==='delete'&&req.filters.some(([key,id])=>key==='id'&&String(id)==='30')));
@@ -119,5 +119,60 @@ test('failed sign-out keeps the dashboard and releases loading',async()=>{
  const {dom,w,d,alerts}=await admin();try{
  assert.equal(typeof w.logoutAdmin,'function');d.querySelector('#adminDashboard').style.display='grid';w.supabaseClient.auth.signOut=async()=>({error:{message:'offline'}});
  await w.logoutAdmin();assert.equal(d.querySelector('#adminDashboard').style.display,'grid');assert.equal(d.querySelector('#loadingOverlay').style.display,'none');assert.ok(alerts.length);
+ }finally{dom.window.close()}
+});
+test('category loading failure blocks saving a misleading empty editor',async()=>{
+ const {dom,w,d,calls,alerts}=await admin(()=>({data:null,error:{message:'load failed'}}));try{
+ w.openCategoriaModal(1);await new Promise(r=>setTimeout(r,5));
+ d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
+ d.querySelector('#categoriaForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);assert.ok(alerts.some(message=>message.includes('carg')));
+ }finally{dom.window.close()}
+});
+test('late category data cannot replace a newly opened blank editor',async()=>{
+ let resolve;const response=new Promise(r=>resolve=r);
+ const {dom,w,d}=await admin(req=>req.table==='categorias'?response:{data:[],error:null});try{
+ const pending=w.loadCategoriaData(1);await Promise.resolve();w.openCategoriaModal();
+ resolve({data:{id:1,titulo:'Old category',descripcion:'Old',icon:'fa',activo:true},error:null});await pending;
+ assert.equal(d.querySelector('#categoriaId').value,'');assert.equal(d.querySelector('#categoriaTitulo').value,'');
+ }finally{dom.window.close()}
+});
+test('repeated category submit starts only one write',async()=>{
+ let resolve;const response=new Promise(r=>resolve=r);
+ const {dom,w,d,calls}=await admin(req=>req.action==='update'?response:{data:[],error:null});try{
+ w.openCategoriaModal();d.querySelector('#categoriaId').value='1';d.querySelector('#categoriaImagenesUrls').value='a||b||c||d';
+ d.querySelector('#categoriaForm').dispatchEvent(new w.Event('submit',{cancelable:true}));d.querySelector('#categoriaForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
+ assert.equal(calls.filter(req=>req.action==='update').length,1);resolve({data:null,error:null});await new Promise(r=>setTimeout(r,5));
+ }finally{resolve?.({data:null,error:null});dom.window.close()}
+});
+test('an unconfirmed variant insertion cannot be blindly retried',async()=>{
+ const {dom,w,calls}=await admin(()=>({data:null,error:{message:'Failed to fetch'}}));try{
+ w.openProductoModal();w.addVariantRow({titulo:'Uncertain'});await assert.rejects(()=>w.saveVariantes(1));await assert.rejects(()=>w.saveVariantes(1));
+ assert.equal(calls.filter(req=>req.action==='insert').length,1);
+ }finally{dom.window.close()}
+});
+test('insert confirmation distinguishes server rejection from uncertain response',async()=>{
+ const {dom,w}=await admin();try{
+ assert.equal(typeof w.confirmInsertedRecord,'function');
+ assert.equal(w.confirmInsertedRecord({data:{id:7},error:null}).id,7);
+ assert.throws(()=>w.confirmInsertedRecord({data:null,error:{code:'42501',message:'permission denied'}}),error=>!error.uncertainWrite);
+ assert.throws(()=>w.confirmInsertedRecord({data:null,error:{message:'Failed to fetch'}}),error=>error.uncertainWrite===true);
+ assert.throws(()=>w.confirmInsertedRecord({data:null,error:null}),error=>error.uncertainWrite===true);
+ }finally{dom.window.close()}
+});
+test('confirmed configuration ID is retained so the next save updates it',async()=>{
+ const {dom,w,d,calls}=await admin(()=>({data:{id:77},error:null}));try{
+ d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
+ assert.equal(d.querySelector('#configId').value,'77');
+ d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
+ assert.equal(calls.filter(req=>req.action==='insert').length,1);assert.equal(calls.filter(req=>req.action==='update').length,1);
+ }finally{dom.window.close()}
+});
+test('transport failures with codes remain uncertain, including aborted requests',async()=>{
+ const {dom,w}=await admin();try{
+ const reset=Object.assign(new Error('socket reset'),{code:'ECONNRESET'});
+ await assert.rejects(()=>w.awaitConfirmedInsert(Promise.reject(reset)),error=>error.uncertainWrite===true);
+ await assert.rejects(()=>w.awaitConfirmedInsert(Promise.reject(new w.DOMException('aborted','AbortError'))),error=>error.uncertainWrite===true);
+ assert.throws(()=>w.confirmInsertedRecord({data:null,error:reset}),error=>error.uncertainWrite===true);
  }finally{dom.window.close()}
 });
