@@ -131,3 +131,63 @@ test('invalid persisted quote items cannot break WhatsApp generation',async()=>{
  let opened;w.open=url=>{opened=url};assert.equal(d.querySelectorAll('#quoteItemsList .quote-item').length,1);assert.doesNotThrow(()=>w.generateWhatsAppQuote());assert.match(new URL(opened).searchParams.get('text'),/VALID PRODUCT/);
  }finally{dom.window.close()}
 });
+
+test('a pending site configuration does not block catalog or category deep links',async()=>{
+ let finishConfig;
+ const {dom,w,d}=await app({configuracion:()=>new Promise(resolve=>{finishConfig=resolve})},{url:'https://example.test/#categoria/1'});
+ try {
+  assert.equal(d.querySelectorAll('#productsGrid .product-card').length,2);
+  assert.equal(d.querySelectorAll('#categoryProductsGrid .product-card').length,2);
+  w.verDetalleProducto(1);
+  finishConfig({data:{nombre_sitio:'Marca actualizada',contacto_whatsapp:'51999888777'},error:null});
+  await new Promise(r=>setTimeout(r,5));
+  assert.equal(d.title,'Marca actualizada');
+  assert.equal(new URL(d.querySelector('#modalWhatsAppBtn').href).pathname,'/51999888777');
+ } finally {dom.window.close()}
+});
+
+test('adding a saved quote item refreshes its current catalog details',async()=>{
+ const old={id:'1',originalId:1,titulo:'Título antiguo',precio:50,imagen:'old.png',qty:2};
+ const {dom,w}=await app({}, {cart:[old]});
+ try {
+  w.addToQuote(1,3);
+  const cart=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(cart.length,1);assert.equal(cart[0].qty,5);
+  assert.equal(cart[0].titulo,'Taladro');assert.equal(cart[0].precio,100);
+  assert.equal(cart[0].imagen,'img/logo.jpeg');
+ } finally {dom.window.close()}
+});
+
+test('adding a saved variant refreshes option price without merging other options',async()=>{
+ const old={id:'1_9',originalId:1,titulo:'Anterior',variante:'Rojo',precio:50,qty:998};
+ const other={...old,id:'1_10',variante:'Negro',qty:2};
+ const {dom,w}=await app({}, {cart:[old,other]});
+ try {
+  w.addToQuote(1,3,{id:9,titulo:'Azul',precio:150,imagen_url:'azul.png'});
+  const cart=JSON.parse(w.localStorage.getItem('ferrenorte_quote'));
+  assert.equal(cart.length,2);assert.equal(cart[0].qty,999);
+  assert.equal(cart[0].variante,'Azul');assert.equal(cart[0].precio,150);
+  assert.equal(cart[0].imagen,'azul.png');assert.equal(cart[1].qty,2);
+  assert.equal(cart[1].variante,'Negro');
+ } finally {dom.window.close()}
+});
+
+test('WhatsApp actions wait for the configured destination without blocking browsing',async()=>{
+ let finishConfig;
+ const {dom,w,d}=await app({configuracion:()=>new Promise(resolve=>{finishConfig=resolve})});
+ try {
+  const alerts=[];const opened=[];w.alert=message=>alerts.push(message);w.open=url=>opened.push(url);
+  w.verDetalleProducto(1);w.addToQuote(1);
+  assert.equal(d.querySelector('#modalWhatsAppBtn').hasAttribute('href'),false);
+  assert.equal(d.querySelector('.contact-whatsapp').hasAttribute('href'),false);
+  w.generateWhatsAppQuote();
+  d.querySelector('#contactForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
+  const click=new w.MouseEvent('click',{bubbles:true,cancelable:true});
+  d.querySelector('#modalWhatsAppBtn').dispatchEvent(click);
+  assert.equal(click.defaultPrevented,true);assert.equal(opened.length,0);assert.equal(alerts.length,3);
+  finishConfig({data:{contacto_whatsapp:'51999888777'},error:null});
+  await new Promise(r=>setTimeout(r,5));w.generateWhatsAppQuote();
+  assert.equal(new URL(opened[0]).pathname,'/51999888777');
+  assert.equal(new URL(d.querySelector('.contact-whatsapp').href).pathname,'/51999888777');
+ } finally {dom.window.close()}
+});

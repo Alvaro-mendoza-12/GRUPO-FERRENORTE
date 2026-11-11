@@ -68,3 +68,12 @@ Verificación acumulada: 55 pruebas, sintaxis y build. Incluye una prueba DOM co
 - Las cotizaciones guardadas se normalizan para que datos locales inválidos no rompan la consulta por WhatsApp.
 
 Verificación acumulada: 92 pruebas locales aprobadas, sintaxis, build y revisión independiente. Se cubren filas no afectadas, guardados parciales, validación de imágenes, navegación e historial. No se modificaron datos ni políticas reales. Siguen pendientes QA visual y verificación autenticada; Vercel requiere conexión y destino confirmado.
+
+## Sexta iteración: carga independiente y consultas
+- La carga de personalización ya no bloquea productos, categorías ni enlaces directos. Las acciones de WhatsApp esperan a que termine la lectura del destino; un diálogo abierto actualiza el número cuando llega la configuración. Ante error de lectura se mantiene el contacto predeterminado existente.
+- Volver a añadir un artículo guardado actualiza su nombre, imagen, variante y precio de referencia con los datos cargados del catálogo, sin perder cantidades ni combinar variantes distintas.
+- Las fichas técnicas incorporan comprobación previa de formato y tamaño antes de subir archivos o guardar el producto. Es una validación básica del cliente, no antivirus ni sustituto del control del servidor.
+
+Pendiente funcional: una cotización restaurada y enviada sin volver a añadir sus artículos conserva los datos de referencia del momento en que se guardó. Revalidar todas las variantes y artículos retirados requiere un flujo explícito; no se eliminan silenciosamente selecciones del cliente. Los importes son referenciales y la consulta no representa un pago ni un pedido confirmado.
+
+Verificación acumulada: 133 pruebas locales aprobadas, sintaxis y build. Fichas permitidas: PDF/DOC/DOCX hasta 10 MiB, firma básica y MIME coherente; DOCX solo verifica contenedor ZIP, no estructura OOXML. Se mantiene pendiente la validación visual/autenticada y el despliegue con destino confirmado.

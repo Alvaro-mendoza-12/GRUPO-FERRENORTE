@@ -48,6 +48,55 @@ async function validateCatalogImage(file) {
     return normalizedExtension;
 }
 
+/**
+ * Basic client-side screening for PDF/DOC/DOCX technical sheets (up to 10 MiB).
+ * MIME may be absent or generic when the browser cannot identify a local file;
+ * its extension and signature must still match. DOC checks the OLE container
+ * signature and DOCX checks the ZIP signature, not the document/package contents.
+ * This is not antivirus or full PDF/OLE/OOXML validation. Server-side checks and
+ * Storage access policies remain necessary.
+ */
+async function validateTechnicalSheet(file) {
+    if (!file || !Number.isFinite(file.size) || file.size <= 0) {
+        throw new Error('El archivo de ficha técnica está vacío.');
+    }
+    if (file.size > 10 * 1024 * 1024) {
+        throw new Error('La ficha técnica no puede superar los 10 MiB.');
+    }
+
+    const formats = {
+        pdf: 'application/pdf',
+        doc: 'application/msword',
+        docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
+    };
+    const match = typeof file.name === 'string' && /\.([^.]+)$/.exec(file.name);
+    const extension = match ? match[1].toLowerCase() : '';
+    const genericMime = file.type === '' || file.type === 'application/octet-stream';
+    if (!Object.prototype.hasOwnProperty.call(formats, extension) ||
+        (!genericMime && file.type !== formats[extension])) {
+        throw new Error('Formato no permitido: selecciona una ficha PDF, DOC o DOCX con extensión y tipo coincidentes.');
+    }
+
+    let bytes;
+    try {
+        bytes = new Uint8Array(await file.slice(0, 8).arrayBuffer());
+    } catch (_) {
+        throw new Error('No se pudo leer el contenido de la ficha técnica. Selecciona el archivo de nuevo.');
+    }
+    const startsWith = signature => signature.every((value, index) => bytes[index] === value);
+    const signatures = {
+        pdf: () => startsWith([0x25, 0x50, 0x44, 0x46, 0x2d]) &&
+            bytes[5] >= 0x30 && bytes[5] <= 0x39 && bytes[6] === 0x2e &&
+            bytes[7] >= 0x30 && bytes[7] <= 0x39,
+        doc: () => startsWith([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]),
+        docx: () => startsWith([0x50, 0x4b, 0x03, 0x04])
+    };
+    if (!signatures[extension]()) {
+        throw new Error('El contenido del archivo no coincide con el formato de ficha técnica indicado.');
+    }
+    return extension;
+}
+
 if (typeof module !== 'undefined' && module.exports) {
-    module.exports = { validateCatalogImage };
+    module.exports = { validateCatalogImage, validateTechnicalSheet };
 }

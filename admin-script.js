@@ -326,7 +326,7 @@ async function uploadImage(file, folder) {
 
 async function uploadFile(file, folder) {
     try {
-        const fileExt = file.name.split('.').pop();
+        const fileExt = await validateTechnicalSheet(file);
         const fileName = `${folder}/${Date.now()}_ficha.${fileExt}`;
         const { data, error } = await supabaseClient.storage
             .from('productos-imagenes')
@@ -716,6 +716,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     try { validateVariantTitles(); } catch (error) { alert('Error: ' + error.message); return; }
     const id = document.getElementById('productoId').value;
     const imagenFile = document.getElementById('productoImagen').files[0];
+    const fichaFile = document.getElementById('productoFichaFile').files[0];
     let imagenUrl = document.getElementById('productoImagenUrl').value;
 
     if (!imagenFile && !imagenUrl) { alert('Imagen requerida'); return; }
@@ -724,11 +725,12 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     document.getElementById('productoForm').inert = true;
     showLoading();
     try {
+        // Reject an invalid sheet before uploading any product or variant file.
+        if (fichaFile) await validateTechnicalSheet(fichaFile);
         if (imagenFile) await validateCatalogImage(imagenFile);
         await prepareVariantImages();
         if (imagenFile) imagenUrl = await uploadImage(imagenFile, 'productos');
 
-        const fichaFile = document.getElementById('productoFichaFile').files[0];
         let fichaUrl = document.getElementById('productoFicha').value;
 
         if (fichaFile) {

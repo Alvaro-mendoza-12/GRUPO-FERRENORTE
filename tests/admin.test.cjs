@@ -317,3 +317,68 @@ test('invalid main product image prevents uploading variant images first',async(
  d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));assert.equal(uploads,0);
  }finally{dom.window.close()}
 });
+
+function recordStorageUploads(w) {
+ const uploads=[];
+ w.supabaseClient.storage={from(bucket){return{
+  upload:async(path,file,options)=>{uploads.push({bucket,path,file,options});return{data:{path},error:null}},
+  getPublicUrl:path=>({data:{publicUrl:`https://example.test/${path}`}})
+ }}};
+ return uploads;
+}
+for (const [label,file] of [
+ ['HTML',new File(['<html>not a sheet</html>'],'sheet.html',{type:'text/html'})],
+ ['empty PDF',new File([],'sheet.pdf',{type:'application/pdf'})],
+ ['false PDF',new File(['<html>not a sheet</html>'],'sheet.pdf',{type:'application/pdf'})],
+ ['oversized PDF',new File(['%PDF-1.7\n',new Uint8Array(10*1024*1024)],'sheet.pdf',{type:'application/pdf'})]
+]) test(`uploadFile rejects ${label} without reaching storage`,async()=>{
+ const {dom,w}=await admin();try{
+ const uploads=recordStorageUploads(w);
+ await assert.rejects(()=>w.uploadFile(file,'fichas'));assert.equal(uploads.length,0);
+ }finally{dom.window.close()}
+});
+test('valid technical sheet upload uses a normalized extension and preserves the file',async()=>{
+ const {dom,w}=await admin();try{
+ const uploads=recordStorageUploads(w);
+ const file=new File(['%PDF-1.7\n'],'sheet.PDF',{type:'application/octet-stream'});
+ const url=await w.uploadFile(file,'fichas');
+ assert.equal(uploads.length,1);assert.match(uploads[0].path,/^fichas\/.*\.pdf$/);
+ assert.equal(uploads[0].file,file);assert.equal(uploads[0].bucket,'productos-imagenes');
+ assert.equal(uploads[0].options.upsert,false);assert.equal(url,`https://example.test/${uploads[0].path}`);
+ }finally{dom.window.close()}
+});
+test('invalid technical sheet blocks every upload and product or variant write',async()=>{
+ const {dom,w,d,calls,alerts}=await admin(()=>({data:{id:1},error:null}));try{
+ const uploads=recordStorageUploads(w);w.openProductoModal();w.addVariantRow({titulo:'Valid option'});
+ const picture=new File([Uint8Array.from([255,216,255])],'photo.jpg',{type:'image/jpeg'});
+ Object.defineProperty(d.querySelector('#productoImagen'),'files',{value:[picture]});
+ Object.defineProperty(d.querySelector('.variant-file-input'),'files',{value:[picture]});
+ Object.defineProperty(d.querySelector('#productoFichaFile'),'files',{value:[new File(['<html>not a sheet</html>'],'sheet.pdf',{type:'application/pdf'})]});
+ d.querySelector('#productoId').value='1';
+ d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
+ assert.equal(uploads.length,0);assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ assert.equal(d.querySelector('.variant-img-url').value,'');assert.ok(alerts.some(message=>/contenido/i.test(message)));
+ assert.equal(d.querySelector('#loadingOverlay').style.display,'none');assert.equal(d.querySelector('#productoForm').inert,false);
+ }finally{dom.window.close()}
+});
+test('a corrected technical sheet can be saved after validation fails',async()=>{
+ const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const uploads=recordStorageUploads(w);w.openProductoModal();d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';
+ let selected=[new File([],'sheet.pdf',{type:'application/pdf'})];
+ Object.defineProperty(d.querySelector('#productoFichaFile'),'files',{get:()=>selected});
+ d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
+ assert.equal(uploads.length,0);assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ selected=[new File(['%PDF-1.7\n'],'sheet.pdf',{type:'application/pdf'})];
+ d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
+ assert.equal(uploads.length,1);
+ const update=calls.find(req=>req.table==='productos'&&req.action==='update');
+ assert.ok(update);assert.equal(update.payload.ficha_tecnica,`https://example.test/${uploads[0].path}`);
+ }finally{dom.window.close()}
+});
+test('saving without a replacement technical sheet preserves its existing reference',async()=>{
+ const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const uploads=recordStorageUploads(w);w.openProductoModal();d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';d.querySelector('#productoFicha').value='https://example.test/existing.pdf';
+ d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
+ assert.equal(uploads.length,0);assert.equal(calls.find(req=>req.table==='productos'&&req.action==='update').payload.ficha_tecnica,'https://example.test/existing.pdf');
+ }finally{dom.window.close()}
+});

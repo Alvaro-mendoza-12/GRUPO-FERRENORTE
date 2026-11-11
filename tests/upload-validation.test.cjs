@@ -54,3 +54,61 @@ test('is available in browser classic scripts without CommonJS', async () => {
   vm.runInContext(fs.readFileSync('upload-validation.js', 'utf8'), context);
   assert.equal(await context.validateCatalogImage(new File([png], 'photo.png', { type: 'image/png' })), 'png');
 });
+
+function technicalSheetValidator() {
+  const validate = require('../upload-validation.js').validateTechnicalSheet;
+  assert.equal(typeof validate, 'function', 'Technical sheet validation must be available');
+  return validate;
+}
+const pdf = Buffer.from('%PDF-1.7\n');
+const doc = Uint8Array.from([0xd0, 0xcf, 0x11, 0xe0, 0xa1, 0xb1, 0x1a, 0xe1]);
+const docx = Uint8Array.from([0x50, 0x4b, 0x03, 0x04]);
+const docxMime = 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+for (const [name, type, bytes, extension] of [
+  ['sheet.PDF', 'application/pdf', pdf, 'pdf'],
+  ['sheet.doc', 'application/msword', doc, 'doc'],
+  ['sheet.DOCX', docxMime, docx, 'docx'],
+  ['sheet.pdf', 'application/octet-stream', pdf, 'pdf'],
+  ['sheet.doc', 'application/octet-stream', doc, 'doc'],
+  ['sheet.docx', 'application/octet-stream', docx, 'docx'],
+  ['sheet.pdf', '', pdf, 'pdf'],
+  ['sheet.doc', '', doc, 'doc'],
+  ['sheet.docx', '', docx, 'docx'],
+]) test(`accepts technical sheet ${name} with ${type || 'unknown browser MIME'}`, async () => {
+  assert.equal(await technicalSheetValidator()(new File([bytes], name, { type })), extension);
+});
+for (const [label, file, reason] of [
+  ['missing file', null, /vacío/i],
+  ['empty PDF', new File([], 'sheet.pdf', { type: 'application/pdf' }), /vacío/i],
+  ['HTML', new File(['<html>not a sheet</html>'], 'sheet.html', { type: 'text/html' }), /formato/i],
+  ['PDF with HTML MIME', new File([pdf], 'sheet.pdf', { type: 'text/html' }), /formato/i],
+  ['mismatching Word MIME', new File([doc], 'sheet.doc', { type: docxMime }), /formato/i],
+  ['PDF disguised as Word', new File([pdf], 'sheet.doc', { type: 'application/msword' }), /contenido/i],
+  ['HTML disguised as PDF', new File(['<html>not a sheet</html>'], 'sheet.pdf', { type: 'application/pdf' }), /contenido/i],
+  ['HTML with generic MIME', new File(['<html>not a sheet</html>'], 'sheet.pdf', { type: 'application/octet-stream' }), /contenido/i],
+  ['HTML with absent MIME', new File(['<html>not a sheet</html>'], 'sheet.pdf'), /contenido/i],
+  ['truncated PDF signature', new File(['%PDF'], 'sheet.pdf', { type: 'application/pdf' }), /contenido/i],
+  ['invalid PDF version', new File(['%PDF-xxx'], 'sheet.pdf', { type: 'application/pdf' }), /contenido/i],
+  ['truncated DOC signature', new File([doc.slice(0, 7)], 'sheet.doc', { type: 'application/msword' }), /contenido/i],
+  ['truncated DOCX signature', new File([docx.slice(0, 3)], 'sheet.docx', { type: docxMime }), /contenido/i],
+  ['HTML disguised as DOCX', new File(['<html>not a sheet</html>'], 'sheet.docx', { type: docxMime }), /contenido/i],
+  ['missing extension', new File([pdf], 'sheet', { type: 'application/pdf' }), /formato/i],
+  ['double-extension HTML', new File([pdf], 'sheet.pdf.html', { type: 'application/pdf' }), /formato/i],
+  ['one byte over 10 MiB', new File([pdf, new Uint8Array(10 * 1024 * 1024 - pdf.length + 1)], 'sheet.pdf', { type: 'application/pdf' }), /10 MiB/i],
+]) test(`rejects technical sheet ${label}`, async () => {
+  await assert.rejects(technicalSheetValidator()(file), reason);
+});
+test('technical sheet accepts exactly 10 MiB', async () => {
+  const file = new File([pdf, new Uint8Array(10 * 1024 * 1024 - pdf.length)], 'sheet.pdf', { type: 'application/pdf' });
+  assert.equal(await technicalSheetValidator()(file), 'pdf');
+});
+test('technical sheet read failures explain how to recover', async () => {
+  const file = { name: 'sheet.pdf', type: 'application/pdf', size: 9, slice() { throw Error('unavailable'); } };
+  await assert.rejects(technicalSheetValidator()(file), /no se pudo leer.*selecciona/i);
+});
+test('technical sheet validator is available in browser classic scripts', async () => {
+  const context = vm.createContext({ Uint8Array });
+  vm.runInContext(fs.readFileSync('upload-validation.js', 'utf8'), context);
+  assert.equal(typeof context.validateTechnicalSheet, 'function');
+  assert.equal(await context.validateTechnicalSheet(new File([pdf], 'sheet.PDF', { type: 'application/pdf' })), 'pdf');
+});

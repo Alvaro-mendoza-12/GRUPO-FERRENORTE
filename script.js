@@ -15,6 +15,7 @@ function escapeHTML(value) {
 let productos = [];
 let categorias = [];
 let catalogReady = false;
+let siteConfigPending = true;
 const DEFAULT_WHATSAPP_NUMBER = '51931137799';
 // Carrito y Selección
 let socialLinks = {
@@ -35,6 +36,19 @@ function getWhatsAppNumber() {
     const fromLink = socialLinks.whatsapp.replace(/\D/g, '');
     return normalizarWhatsAppNumber(fromLink);
 }
+
+function contactDestinationReady() {
+    if (!siteConfigPending) return true;
+    alert('Estamos cargando los datos de contacto. Intenta nuevamente en unos segundos.');
+    return false;
+}
+
+document.addEventListener('click', event => {
+    const link = event.target.closest?.('a');
+    if (link && (link.dataset.contactPending || /^https:\/\/wa\.me\//i.test(link.href)) && !contactDestinationReady()) {
+        event.preventDefault();
+    }
+}, true);
 
 function syncBodyScrollLock() {
     const navOpen = document.getElementById('navMenu')?.classList.contains('active');
@@ -599,6 +613,15 @@ function changeModalQty(val) {
 }
 
 function updateProductWhatsApp() {
+    const button = document.getElementById('modalWhatsAppBtn');
+    if (siteConfigPending) {
+        button.removeAttribute('href');
+        button.dataset.contactPending = 'true';
+        button.setAttribute('aria-disabled', 'true');
+        return;
+    }
+    delete button.dataset.contactPending;
+    button.removeAttribute('aria-disabled');
     if (!currentModalProduct) return;
     const quantity = Math.max(1, Math.min(999, Number(document.getElementById('modalQty').value) || 1));
     const price = selectedVariant?.precio > 0 ? selectedVariant.precio : currentModalProduct.precio;
@@ -650,19 +673,20 @@ function addToQuote(id, qty = 1, variant = null) {
     // Generar un ID único para la combinación producto-variante
     const cartItemId = variant ? `${id}_${variant.id}` : `${id}`;
 
+    const currentDetails = {
+        id: cartItemId,
+        originalId: id,
+        titulo: producto.titulo,
+        variante: variant ? variant.titulo : null,
+        imagen: variant && variant.imagen_url ? variant.imagen_url : producto.imagen,
+        precio: variant && variant.precio > 0 ? variant.precio : producto.precio
+    };
     const existing = quoteCart.find(item => item.id == cartItemId);
     if (existing) {
-        existing.qty = Math.min(999, existing.qty + qty);
+        // Un artículo guardado puede tener un precio o nombre anterior.
+        Object.assign(existing, currentDetails, {qty: Math.min(999, existing.qty + qty)});
     } else {
-        quoteCart.push({
-            id: cartItemId,
-            originalId: id,
-            titulo: producto.titulo,
-            variante: variant ? variant.titulo : null,
-            imagen: variant && variant.imagen_url ? variant.imagen_url : producto.imagen,
-            precio: variant && variant.precio > 0 ? variant.precio : producto.precio,
-            qty: qty
-        });
+        quoteCart.push({...currentDetails, qty});
     }
 
     saveQuote();
@@ -894,6 +918,7 @@ function getUserLocation() {
 
 // Generar WhatsApp de Cotización Profesional
 function generateWhatsAppQuote() {
+    if (!contactDestinationReady()) return;
     if (quoteCart.length === 0) {
         alert("Agrega productos a tu lista antes de generar la cotización.");
         return;
@@ -1122,6 +1147,7 @@ const contactForm = document.getElementById('contactForm');
 if (contactForm) {
     contactForm.addEventListener('submit', (e) => {
         e.preventDefault();
+        if (!contactDestinationReady()) return;
 
         // Get form data
         const formData = {
@@ -1273,10 +1299,14 @@ floatingCards.forEach((card, index) => {
 // ===========================
 // Social links moved to the top for resilience
 
-// Apply links to all social icons
-document.querySelectorAll('.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float').forEach(link => {
-    link.href = socialLinks.whatsapp;
+// Remove pending destinations, including middle-click/context-menu navigation.
+const contactLinkSelector = '.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float, .contact-whatsapp';
+document.querySelectorAll(contactLinkSelector).forEach(link => {
+    link.removeAttribute('href');
+    link.dataset.contactPending = 'true';
+    link.setAttribute('aria-disabled', 'true');
 });
+updateProductWhatsApp();
 
 document.querySelectorAll('.social-icon.facebook, .footer-social-link.facebook').forEach(link => {
     link.href = socialLinks.facebook;
@@ -1371,12 +1401,23 @@ async function cargarConfiguracionSitio() {
             socialLinks.whatsapp = `https://wa.me/${waNumber}`;
 
             // Update all buttons
-            document.querySelectorAll('.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float').forEach(link => {
+            document.querySelectorAll('.social-icon.whatsapp, .footer-social-link.whatsapp, .whatsapp-float, .contact-whatsapp').forEach(link => {
                 link.href = socialLinks.whatsapp;
             });
+            updateProductWhatsApp();
         }
 
     } catch (e) { console.error('Error loading config:', e); }
+    finally {
+        siteConfigPending = false;
+        document.querySelectorAll(contactLinkSelector).forEach(link => {
+            link.href = socialLinks.whatsapp;
+            delete link.dataset.contactPending;
+            link.removeAttribute('aria-disabled');
+            if (link.classList.contains('contact-whatsapp')) link.textContent = `+${getWhatsAppNumber()}`;
+        });
+        updateProductWhatsApp();
+    }
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -1389,9 +1430,10 @@ document.addEventListener('DOMContentLoaded', async () => {
     try { renderQuoteItems(); } catch (e) { console.error("Error renderQuoteItems:", e); }
     try { updateCartCount(); } catch (e) { console.error("Error updateCartCount:", e); }
 
-    // Cargar datos asíncronos
+    // La personalización no debe bloquear el catálogo ni sus enlaces directos.
+    // La función maneja sus propios errores y aplica la configuración al llegar.
+    void cargarConfiguracionSitio();
     try {
-        await cargarConfiguracionSitio();
         await Promise.all([
             cargarProductos(),
             cargarCategorias()
