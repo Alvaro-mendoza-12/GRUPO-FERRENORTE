@@ -168,7 +168,7 @@
 
                         <div class="form-group">
                             <label for="configLogo">Logo del Sitio</label>
-                            <input type="file" id="configLogo" accept="image/*" class="file-input">
+                            <input type="file" id="configLogo" accept="image/jpeg,image/png,image/webp,image/gif" class="file-input">
                             <div id="configLogoPreview" class="image-preview config-logo-preview"></div>
                             <input type="hidden" id="configLogoUrl">
                         </div>
@@ -216,7 +216,7 @@
 
                 <div class="form-group">
                     <label for="productoImagen">Imagen del Producto *</label>
-                    <input type="file" id="productoImagen" accept="image/*" class="file-input">
+                    <input type="file" id="productoImagen" accept="image/jpeg,image/png,image/webp,image/gif" class="file-input">
                     <div id="productoImagenPreview" class="image-preview"></div>
                     <input type="hidden" id="productoImagenUrl">
                     <small>Formatos: JPG, PNG, WEBP • Tamaño máx: 5MB</small>
@@ -341,7 +341,7 @@
 
                 <div class="form-group">
                     <label for="categoriaImagenes">Imágenes de la Categoría (4 imágenes) *</label>
-                    <input type="file" id="categoriaImagenes" accept="image/*" multiple class="file-input">
+                    <input type="file" id="categoriaImagenes" accept="image/jpeg,image/png,image/webp,image/gif" multiple class="file-input">
                     <div id="categoriaImagenesPreview" class="images-preview"></div>
                     <input type="hidden" id="categoriaImagenesUrls">
                     <small>Selecciona 4 imágenes • Formatos: JPG, PNG, WEBP</small>
@@ -387,6 +387,7 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.118.0"></script>
     <script src="supabase-config.js"></script>
+    <script src="upload-validation.js"></script>
     <script src="admin-script.js"></script>
 </body>
 

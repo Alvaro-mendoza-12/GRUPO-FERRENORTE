@@ -7,9 +7,10 @@ const fixture={
  categorias:[{id:1,titulo:'Herramientas',descripcion:'Para tu proyecto',icon:'fas fa-tools'}],
  categoria_imagenes:[{imagen_url:'img/logo.jpeg'}],variantes:[],configuracion:null
 };
-async function app(overrides={}){
- const dom=new JSDOM(fs.readFileSync('index.html','utf8'),{url:'https://example.test/',runScripts:'outside-only',pretendToBeVisual:true});
+async function app(overrides={},options={}){
+ const dom=new JSDOM(fs.readFileSync('index.html','utf8'),{url:options.url || 'https://example.test/',runScripts:'outside-only',pretendToBeVisual:true});
  const w=dom.window;
+ if(options.cart) w.localStorage.setItem('ferrenorte_quote',JSON.stringify(options.cart));
  w.console={log(){},error(){},warn(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.IntersectionObserver=class {observe(){} unobserve(){}};
  w.supabaseClient={from(table){const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(resolve){const value=(table in overrides?overrides:fixture)[table];return Promise.resolve(typeof value==='function'?value():{data:value,error:null}).then(resolve)}};return q}};
@@ -104,5 +105,29 @@ test('closed quote panel is hidden from keyboard and accessibility, with real st
  const panel=d.querySelector('#quoteSidebar');assert.equal(w.getComputedStyle(panel).visibility,'hidden');assert.equal(panel.hasAttribute('inert'),true);assert.equal(panel.getAttribute('aria-hidden'),'true');
  w.openQuoteSidebar();assert.equal(w.getComputedStyle(panel).visibility,'visible');assert.equal(panel.hasAttribute('inert'),false);assert.equal(panel.getAttribute('aria-hidden'),'false');
  w.closeQuoteSidebar();assert.equal(panel.hasAttribute('inert'),true);assert.equal(panel.getAttribute('aria-hidden'),'true');
+ }finally{dom.window.close()}
+});
+test('footer navigation restores sections hidden by category detail',async()=>{
+ const {dom,w,d}=await app();try{
+ w.verDetalleCategoria(1);d.querySelector('footer a[href="#productos"]').click();await new Promise(r=>setTimeout(r,5));
+ assert.equal(d.querySelector('#productos').style.display,'');assert.equal(d.querySelector('#categoryDetailView').style.display,'none');assert.equal(w.location.hash,'#productos');
+ }finally{dom.window.close()}
+});
+test('category detail supports direct links and browser back/forward',async()=>{
+ const {dom,w,d}=await app({}, {url:'https://example.test/#categoria/1'});try{
+ assert.equal(d.querySelector('#categoryDetailView').style.display,'block');w.volverAlInicio();assert.equal(w.location.hash,'#categorias');
+ w.history.back();await new Promise(r=>setTimeout(r,30));assert.equal(d.querySelector('#categoryDetailView').style.display,'block');
+ w.history.forward();await new Promise(r=>setTimeout(r,30));assert.equal(d.querySelector('#categoryDetailView').style.display,'none');
+ }finally{dom.window.close()}
+});
+test('Enter in product search opens matching catalog results',async()=>{
+ const {dom,w,d}=await app();try{
+ w.verDetalleCategoria(1);const input=d.querySelector('.searchInput');input.value='martillo';input.dispatchEvent(new w.Event('input'));input.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Enter',bubbles:true,cancelable:true}));
+ assert.equal(d.querySelector('#productos').style.display,'');assert.equal(d.querySelectorAll('#productsGrid .product-card').length,1);
+ }finally{dom.window.close()}
+});
+test('invalid persisted quote items cannot break WhatsApp generation',async()=>{
+ const {dom,w,d}=await app({}, {cart:[{id:'1',titulo:null,qty:1},{id:'2',titulo:'Valid product',qty:2,precio:20}]});try{
+ let opened;w.open=url=>{opened=url};assert.equal(d.querySelectorAll('#quoteItemsList .quote-item').length,1);assert.doesNotThrow(()=>w.generateWhatsAppQuote());assert.match(new URL(opened).searchParams.get('text'),/VALID PRODUCT/);
  }finally{dom.window.close()}
 });

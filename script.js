@@ -14,6 +14,7 @@ function escapeHTML(value) {
 // Variables globales para almacenar los datos
 let productos = [];
 let categorias = [];
+let catalogReady = false;
 const DEFAULT_WHATSAPP_NUMBER = '51931137799';
 // Carrito y Selección
 let socialLinks = {
@@ -49,7 +50,13 @@ try {
     const saved = localStorage.getItem('ferrenorte_quote');
     if (saved) {
         quoteCart = JSON.parse(saved);
-        quoteCart = quoteCart.filter(item => item && /^[0-9]+(?:_[0-9]+)?$/.test(String(item.id))).map(item => ({ ...item, qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty)) || 1)) }));
+        quoteCart = quoteCart.filter(item => item && /^[0-9]+(?:_[0-9]+)?$/.test(String(item.id)) && typeof item.titulo === 'string' && item.titulo.trim()).map(item => ({
+            id: String(item.id), originalId: item.originalId,
+            titulo: item.titulo, variante: typeof item.variante === 'string' ? item.variante : null,
+            imagen: typeof item.imagen === 'string' ? item.imagen : 'img/logo.jpeg',
+            precio: Number.isFinite(Number(item.precio)) && Number(item.precio) > 0 ? Number(item.precio) : 0,
+            qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty)) || 1))
+        }));
     }
 } catch (e) {
     console.error("Error parsing cart:", e);
@@ -269,7 +276,7 @@ function renderCategorias() {
 // VISTA DETALLE DE CATEGORÍA
 // ===========================
 
-function verDetalleCategoria(id) {
+function verDetalleCategoria(id, updateHistory = true) {
     console.log("Abriendo categoría:", id);
 
     // 1. Buscar la categoría
@@ -286,7 +293,7 @@ function verDetalleCategoria(id) {
         if (el) el.style.display = 'none';
     });
 
-    const stats = document.querySelector('.stats-section');
+    const stats = document.querySelector('.service-strip, .stats-section');
     if (stats) stats.style.display = 'none';
 
     // 3. Configurar y mostrar vista detalle
@@ -335,6 +342,9 @@ function verDetalleCategoria(id) {
 
     // Mostrar sección y subir scroll
     detailView.style.display = 'block';
+    if (updateHistory && window.location.hash !== `#categoria/${id}`) window.history.pushState(null, '', `#categoria/${id}`);
+    titleEl?.setAttribute('tabindex', '-1');
+    titleEl?.focus({ preventScroll: true });
     window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
@@ -350,18 +360,59 @@ function mostrarSeccionesPrincipales() {
         if (el) el.style.display = ''; // Revert to CSS
     });
 
-    const stats = document.querySelector('.stats-section');
+    const stats = document.querySelector('.service-strip, .stats-section');
     if (stats) stats.style.display = ''; // Revert to CSS
 }
 
 function volverAlInicio() {
-    mostrarSeccionesPrincipales();
-
-    // Scroll a la sección de categorías
-    const cats = document.getElementById('categorias');
-    if (cats) cats.scrollIntoView({ behavior: 'smooth' });
+    navigateStorefrontSection('categorias');
 }
 
+function navigateStorefrontSection(id) {
+    const target = document.getElementById(id);
+    if (!target) return;
+    cerrarModalProducto();
+    closeQuoteSidebar();
+    mobileNavBackdrop?.click();
+    mostrarSeccionesPrincipales();
+    if (window.location.hash !== `#${id}`) window.history.pushState(null, '', `#${id}`);
+    target.setAttribute('tabindex', '-1');
+    target.focus({ preventScroll: true });
+    target.scrollIntoView({ behavior: 'smooth' });
+}
+
+function restoreStorefrontRoute() {
+    if (!catalogReady) return;
+    cerrarModalProducto();
+    closeQuoteSidebar();
+    const match = window.location.hash.match(/^#categoria\/(\d+)$/);
+    if (match) {
+        const id = Number(match[1]);
+        if (categorias.some(category => category.id == id)) {
+            verDetalleCategoria(id, false);
+            return;
+        }
+        window.history.replaceState(null, '', '#categorias');
+    }
+    mostrarSeccionesPrincipales();
+    const target = document.getElementById(window.location.hash.slice(1));
+    if (target) {
+        target.setAttribute('tabindex', '-1');
+        target.focus({ preventScroll: true });
+        target.scrollIntoView({ behavior: 'smooth' });
+    }
+}
+
+window.addEventListener('hashchange', restoreStorefrontRoute);
+document.addEventListener('click', event => {
+    if (event.defaultPrevented || event.button !== 0 || event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;
+    const link = event.target.closest('a[href^="#"]');
+    if (!link || link.target === '_blank') return;
+    const id = link.getAttribute('href').slice(1);
+    if (!id || !document.getElementById(id)) return;
+    event.preventDefault();
+    navigateStorefrontSection(id);
+});
 
 // Función para manejar la selección de categorías (click)
 function seleccionarCategoria(elemento) {
@@ -747,12 +798,16 @@ function initSearch() {
     ];
 
     document.querySelectorAll('.searchBtn').forEach(button => button.addEventListener('click', () => {
-        mostrarSeccionesPrincipales();
-        mobileNavBackdrop?.click();
+        navigateStorefrontSection('productos');
         document.querySelectorAll('.search-results-dropdown').forEach(el => el.classList.remove('active'));
-        document.getElementById('productos').scrollIntoView({ behavior: 'smooth' });
     }));
     inputs.forEach(input => {
+        input.addEventListener('keydown', event => {
+            if (event.key === 'Enter') {
+                event.preventDefault();
+                input.closest('.search-wrapper').querySelector('.searchBtn').click();
+            }
+        });
         input.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase().trim();
             renderProductos(productos.filter(p => p.titulo.toLowerCase().includes(term) || p.descripcion.toLowerCase().includes(term)));
@@ -1001,7 +1056,7 @@ const statNumbers = document.querySelectorAll('.stat-number');
 let hasAnimated = false;
 
 function animateCounters() {
-    const statsSection = document.querySelector('.stats-section');
+    const statsSection = document.querySelector('.service-strip, .stats-section');
     if (!statsSection) return;
 
     const statsSectionTop = statsSection.offsetTop;
@@ -1344,6 +1399,8 @@ document.addEventListener('DOMContentLoaded', async () => {
     } catch (e) {
         console.error("Error loading data:", e);
     }
+    catalogReady = true;
+    restoreStorefrontRoute();
 
     setTimeout(() => {
         try { initializeAnimations(); } catch (e) { }

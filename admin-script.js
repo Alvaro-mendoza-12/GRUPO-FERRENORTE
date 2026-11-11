@@ -32,6 +32,40 @@ async function awaitConfirmedInsert(query) {
     return confirmInsertedRecord(result);
 }
 
+async function requireAffectedRecord(query) {
+    const { data, error } = await query.select('id').single();
+    if (error) throw error;
+    if (!data || Array.isArray(data) || data.id == null) {
+        throw new Error('No se confirmó el cambio del registro. Puede haber cambiado o no estar disponible. Recarga el listado antes de reintentar.');
+    }
+    return data;
+}
+
+function validateVariantTitles() {
+    for (const row of document.querySelectorAll('.variant-row')) {
+        if (!row.querySelector('.variant-titulo').value.trim()) {
+            throw new Error('Cada variante necesita un título. Completa el campo o elimina la fila explícitamente.');
+        }
+    }
+}
+
+async function prepareVariantImages() {
+    validateVariantTitles();
+    const rows = [...document.querySelectorAll('.variant-row')];
+    // Validate every selection before uploading any image or changing database rows.
+    for (const row of rows) {
+        const file = row.querySelector('.variant-file-input').files[0];
+        if (file) await validateCatalogImage(file);
+    }
+    for (const row of rows) {
+        const input = row.querySelector('.variant-file-input');
+        if (!input.files[0]) continue;
+        const url = await uploadImage(input.files[0], 'variantes');
+        row.querySelector('.variant-img-url').value = url;
+        input.value = '';
+    }
+}
+
 // ===========================
 // VARIABLES GLOBALES
 // ===========================
@@ -273,7 +307,7 @@ document.getElementById('addNewBtn').addEventListener('click', () => {
 // ===========================
 async function uploadImage(file, folder) {
     try {
-        const fileExt = file.name.split('.').pop();
+        const fileExt = await validateCatalogImage(file);
         const fileName = `${folder}/${Date.now()}_${Math.random().toString(36).substring(7)}.${fileExt}`;
         const { data, error } = await supabaseClient.storage
             .from('productos-imagenes')
@@ -630,7 +664,7 @@ function addVariantRow(data = {}) {
             <div class="variant-preview-wrapper" style="width: 35px; height: 35px; border-radius: 6px; overflow: hidden; background: #f1f5f9; border: 1px solid var(--gray-200);">
                 <img class="variant-preview-img" src="${escapeAdminHTML(data.imagen_url || 'img/logo.jpeg')}" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
-            <input type="file" id="${rowId}" class="variant-file-input" accept="image/*" style="display: none;">
+            <input type="file" id="${rowId}" class="variant-file-input" accept="image/jpeg,image/png,image/webp,image/gif" style="display: none;">
             <button type="button" class="btn-icon" onclick="document.getElementById('${rowId}').click()" style="background: var(--gray-100); border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--gray-600);">
                 <i class="fas fa-camera"></i>
             </button>
@@ -664,8 +698,7 @@ async function deleteProducto(id, titulo) {
     if (!confirm(`¿Eliminar "${titulo}"?`)) return;
     showLoading();
     try {
-        const { error } = await supabaseClient.from('productos').delete().eq('id', id);
-        if (error) throw error;
+        await requireAffectedRecord(supabaseClient.from('productos').delete().eq('id', id));
         alert('Producto eliminado');
         await loadProductos(currentCategoryFilter);
     } catch (error) {
@@ -680,6 +713,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     if (productSaveInProgress) return;
     if (productWriteUncertain) { alert('Comprueba el catálogo y vuelve a abrir el registro antes de reintentar un guardado sin confirmar.'); return; }
     if (!variantsReady) { alert('No se cargaron las variantes. Vuelve a abrir el producto antes de guardar.'); return; }
+    try { validateVariantTitles(); } catch (error) { alert('Error: ' + error.message); return; }
     const id = document.getElementById('productoId').value;
     const imagenFile = document.getElementById('productoImagen').files[0];
     let imagenUrl = document.getElementById('productoImagenUrl').value;
@@ -690,6 +724,8 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     document.getElementById('productoForm').inert = true;
     showLoading();
     try {
+        if (imagenFile) await validateCatalogImage(imagenFile);
+        await prepareVariantImages();
         if (imagenFile) imagenUrl = await uploadImage(imagenFile, 'productos');
 
         const fichaFile = document.getElementById('productoFichaFile').files[0];
@@ -714,8 +750,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
         };
 
         if (id) {
-            const { data: updatedProd, error: updateError } = await supabaseClient.from('productos').update(producto).eq('id', id).select().single();
-            if (updateError) throw updateError;
+            await requireAffectedRecord(supabaseClient.from('productos').update(producto).eq('id', id));
             await saveVariantes(id);
         } else {
             const newProd = await awaitConfirmedInsert(supabaseClient.from('productos').insert([producto]).select('id').single());
@@ -739,19 +774,13 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
 async function saveVariantes(productoId) {
     if (productWriteUncertain) throw new Error('Revisa el catálogo y vuelve a abrir el producto antes de reintentar.');
     if (!variantsReady) throw new Error('No se cargaron las variantes. Cierra y vuelve a abrir el producto antes de guardar.');
+    await prepareVariantImages();
     const rows = [...document.querySelectorAll('.variant-row')];
     const prepared = [];
     // Complete uploads and validation before any row is written or removed.
     for (const row of rows) {
         const titulo = row.querySelector('.variant-titulo').value.trim();
-        if (!titulo) continue;
-        const fileInput = row.querySelector('.variant-file-input');
-        let imagen_url = row.querySelector('.variant-img-url').value;
-        if (fileInput.files.length) {
-            imagen_url = await uploadImage(fileInput.files[0], 'variantes');
-            row.querySelector('.variant-img-url').value = imagen_url;
-            fileInput.value = '';
-        }
+        const imagen_url = row.querySelector('.variant-img-url').value;
         prepared.push({ row, payload: {
             producto_id: productoId, titulo,
             precio: parseFloat(row.querySelector('.variant-precio').value) || 0,
@@ -762,8 +791,7 @@ async function saveVariantes(productoId) {
     for (const { row, payload } of prepared) {
         const id = row.dataset.id;
         if (id) {
-            const { error } = await supabaseClient.from('variantes').update(payload).eq('id', id).eq('producto_id', productoId);
-            if (error) throw error;
+            await requireAffectedRecord(supabaseClient.from('variantes').update(payload).eq('id', id).eq('producto_id', productoId));
             retainedIds.add(id);
         } else {
             let data;
@@ -779,10 +807,10 @@ async function saveVariantes(productoId) {
         }
     }
     // Only remove rows loaded in this editor, never concurrently added rows.
-    for (const id of loadedVariantIds) {
+    for (const id of [...loadedVariantIds]) {
         if (retainedIds.has(id)) continue;
-        const { error } = await supabaseClient.from('variantes').delete().eq('id', id).eq('producto_id', productoId);
-        if (error) throw error;
+        await requireAffectedRecord(supabaseClient.from('variantes').delete().eq('id', id).eq('producto_id', productoId));
+        loadedVariantIds = loadedVariantIds.filter(existingId => existingId !== id);
     }
     loadedVariantIds = [...retainedIds];
 }
@@ -901,8 +929,7 @@ async function deleteCategoria(id, title) {
     if (!confirm(`¿Eliminar categoría "${title}"?`)) return;
     showLoading();
     try {
-        const { error } = await supabaseClient.from('categorias').delete().eq('id', id);
-        if (error) throw error;
+        await requireAffectedRecord(supabaseClient.from('categorias').delete().eq('id', id));
         alert('Categoría eliminada');
         await loadCategorias();
     } catch (e) { console.error(e); alert('Error al eliminar'); }
@@ -935,6 +962,7 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
     try {
         let urls = [];
         if (files.length > 0) {
+            for (const file of files) await validateCatalogImage(file);
             for (let i = 0; i < files.length; i++) urls.push(await uploadImage(files[i], 'categorias'));
         } else {
             urls = existing.split('||');
@@ -942,8 +970,7 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
 
         let catId = id;
         if (id) {
-            const { error } = await supabaseClient.from('categorias').update(cat).eq('id', id);
-            if (error) throw error;
+            await requireAffectedRecord(supabaseClient.from('categorias').update(cat).eq('id', id));
         } else {
             const data = await awaitConfirmedInsert(supabaseClient.from('categorias').insert([cat]).select('id').single());
             catId = data.id;
@@ -977,15 +1004,13 @@ async function saveCategoryImages(categoryId, urls) {
     for (let index = 0; index < urls.length; index++) {
         const payload = { categoria_id: categoryId, imagen_url: urls[index], orden: index + 1 };
         if (previous[index]) {
-            const { error: writeError } = await supabaseClient.from('categoria_imagenes').update(payload).eq('id', previous[index].id).eq('categoria_id', categoryId);
-            if (writeError) throw writeError;
+            await requireAffectedRecord(supabaseClient.from('categoria_imagenes').update(payload).eq('id', previous[index].id).eq('categoria_id', categoryId));
         } else {
             await awaitConfirmedInsert(supabaseClient.from('categoria_imagenes').insert([payload]).select('id').single());
         }
     }
     for (const image of previous.slice(urls.length)) {
-        const { error: deleteError } = await supabaseClient.from('categoria_imagenes').delete().eq('id', image.id).eq('categoria_id', categoryId);
-        if (deleteError) throw deleteError;
+        await requireAffectedRecord(supabaseClient.from('categoria_imagenes').delete().eq('id', image.id).eq('categoria_id', categoryId));
     }
 }
 
@@ -1067,8 +1092,7 @@ document.getElementById('configForm').addEventListener('submit', async (e) => {
         };
 
         if (id) {
-            const { error } = await supabaseClient.from('configuracion').update(config).eq('id', id);
-            if (error) throw error;
+            await requireAffectedRecord(supabaseClient.from('configuracion').update(config).eq('id', id));
         } else {
             const data = await awaitConfirmedInsert(supabaseClient.from('configuracion').insert([config]).select('id').single());
             document.getElementById('configId').value = data.id;

@@ -59,3 +59,12 @@ QA visual adicional: el servidor anunció escucha en 8766, pero tanto una compro
 - Los errores al cargar opciones son visibles; respuestas antiguas no reemplazan las opciones del producto actual.
 
 Verificación acumulada: 55 pruebas, sintaxis y build. Incluye una prueba DOM con CSS real para la visibilidad del panel cerrado. Esto no sustituye QA visual en navegador ni pruebas de Supabase real; esos pendientes se mantienen.
+
+## Quinta iteración: integridad y navegación
+- Un título de variante vacío bloquea el guardado antes de modificar el producto; ya no equivale a eliminar la variante. Los borrados confirmados se retiran del seguimiento para que un reintento parcial no los repita.
+- Las actualizaciones y eliminaciones exigen que Supabase devuelva el registro afectado. Una respuesta sin filas no se anuncia como éxito.
+- Las imágenes se validan antes de subirlas: JPEG, PNG, WebP o GIF, hasta 5 MiB, con extensión, MIME y firma coherentes. Se revisan todas las imágenes seleccionadas antes de iniciar el lote; los fallos de variantes preceden al guardado del producto. Esta comprobación del cliente no sustituye validación del servidor, decodificación completa ni antivirus.
+- La navegación del pie y la búsqueda con Enter recuperan las secciones principales desde una categoría. Las categorías admiten enlaces directos e historial del navegador.
+- Las cotizaciones guardadas se normalizan para que datos locales inválidos no rompan la consulta por WhatsApp.
+
+Verificación acumulada: 92 pruebas locales aprobadas, sintaxis, build y revisión independiente. Se cubren filas no afectadas, guardados parciales, validación de imágenes, navegación e historial. No se modificaron datos ni políticas reales. Siguen pendientes QA visual y verificación autenticada; Vercel requiere conexión y destino confirmado.
