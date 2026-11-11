@@ -9,7 +9,7 @@ async function admin(handler=()=>({data:[],error:null})){
  w.console={log(){},error(){},warn(){}};w.alert=message=>alerts.push(message);w.confirm=()=>true;
  w.supabaseClient={auth:{getSession:async()=>({data:{session:null},error:null}),signOut:async()=>({error:null})},from(table){
  const request={table,action:'select',filters:[]};
- const q={select(){return q},eq(key,value){request.filters.push([key,value]);return q},order(){return q},limit(value){request.limit=value;return q},single(){return q},delete(){request.action='delete';return q},insert(payload){request.action='insert';request.payload=payload;return q},update(payload){request.action='update';request.payload=payload;return q},then(resolve,reject){calls.push({...request});return Promise.resolve(handler(request)).then(resolve,reject)}};return q;
+ const q={select(columns){request.columns=columns;return q},eq(key,value){request.filters.push([key,value]);return q},order(){return q},limit(value){request.limit=value;return q},single(){return q},delete(){request.action='delete';return q},insert(payload){request.action='insert';request.payload=payload;return q},update(payload){request.action='update';request.payload=payload;return q},then(resolve,reject){calls.push({...request});return Promise.resolve(handler(request)).then(resolve,reject)}};return q;
  }};
  w.eval(fs.readFileSync('upload-validation.js','utf8'));
  w.eval(fs.readFileSync('admin-script.js','utf8'));
@@ -35,7 +35,7 @@ test('admin category and variant strings stay literal',async()=>{
  }finally{dom.window.close()}
 });
 test('new product form clears previously edited variants',async()=>{
- const {dom,w,d}=await admin();try{w.addVariantRow({id:8,titulo:'Previous product'});w.openProductoModal();assert.equal(d.querySelectorAll('.variant-row').length,0)}finally{dom.window.close()}
+ const {dom,w,d}=await admin();try{w.addVariantRow({id:8,titulo:'Previous product'});w.openProductoModal();assert.equal(d.querySelectorAll('.variant-row').length,0)}finally{await settleAdmin();dom.window.close()}
 });
 test('failed category deletion never reports success',async()=>{
  const {dom,w,alerts}=await admin(()=>({data:null,error:{message:'permission denied'}}));try{
@@ -49,6 +49,162 @@ test('failed configuration save never reports success',async()=>{
  }finally{dom.window.close()}
 });
 module.exports={admin};
+
+const categoryOptions=[{id:1,titulo:'Herramientas'},{id:2,titulo:'Pinturas'}];
+const hammer={id:7,titulo:'Martillo',descripcion:'Acero',imagen_url:'img/logo.jpeg',orden:0,activo:true,categoria_id:1};
+const paint={...hammer,id:8,titulo:'Pintura',categoria_id:2};
+const settleAdmin=()=>new Promise(resolve=>setTimeout(resolve,5));
+function deferredAdmin(){let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve}}
+function withAvailableCategories(handler=()=>({data:[],error:null})) {
+ return req=>req.table==='categorias'&&req.columns==='id, titulo'?{data:categoryOptions,error:null}:handler(req);
+}
+async function chooseProductCategory(w,d) {
+ await settleAdmin();
+ const select=d.getElementById('productoCategoria');select.value='1';select.dispatchEvent(new w.Event('change'));
+ assert.equal(select.disabled,false);assert.equal(select.value,'1');
+}
+
+test('category selector failure has a working retry without losing product edits',async()=>{
+ let fail=true;const {dom,w,d,calls}=await admin(()=>fail?{data:null,error:{message:'offline'}}:{data:categoryOptions,error:null});try{
+ w.openProductoModal();d.getElementById('productoTitulo').value='Mi producto';await settleAdmin();
+ const status=d.getElementById('productoCategoriaStatus');
+ assert.ok(status&&!status.hidden,'the missing category list must explain the failure visibly');
+ assert.match(status.textContent,/categorías/i);assert.equal(d.getElementById('productoCategoria').disabled,true);
+ assert.equal(d.querySelector('#productoForm [type="submit"]').disabled,true);
+ d.getElementById('productoImagenUrl').value='img/logo.jpeg';
+ d.getElementById('productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await settleAdmin();
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ fail=false;d.getElementById('retryProductoCategorias').click();await settleAdmin();
+ assert.equal(d.getElementById('productoCategoria').disabled,false);assert.equal(status.hidden,true);
+ assert.equal(d.querySelector('#productoForm [type="submit"]').disabled,false);
+ assert.equal(d.getElementById('productoTitulo').value,'Mi producto');
+ assert.equal(d.querySelector('#productoCategoria option[value="2"]').textContent,'Pinturas');
+ }finally{dom.window.close()}
+});
+test('reopening the product editor retries a failed category list automatically',async()=>{
+ let fail=true;const {dom,w,d,calls}=await admin(()=>fail?{data:null,error:{message:'offline'}}:{data:categoryOptions,error:null});try{
+ w.openProductoModal();await settleAdmin();w.closeProductoModal();fail=false;w.openProductoModal();await settleAdmin();
+ assert.equal(calls.filter(req=>req.table==='categorias').length,2);
+ assert.equal(d.querySelector('#productoCategoria option[value="1"]').textContent,'Herramientas');
+ assert.equal(d.getElementById('productoCategoria').disabled,false);
+ }finally{dom.window.close()}
+});
+test('refreshing category options preserves the selected valid category',async()=>{
+ const {dom,w,d}=await admin(()=>({data:categoryOptions,error:null}));try{
+ await w.loadCategoriasSelect();d.getElementById('productoCategoria').value='2';
+ await w.loadCategoriasSelect();assert.equal(d.getElementById('productoCategoria').value,'2');
+ }finally{dom.window.close()}
+});
+test('obsolete category option responses cannot replace newer options or selection',async()=>{
+ const old=deferredAdmin();let count=0;
+ const {dom,w,d}=await admin(()=>++count===1?old.promise:{data:categoryOptions,error:null});try{
+ const first=w.loadCategoriasSelect();await settleAdmin();await w.loadCategoriasSelect();
+ d.getElementById('productoCategoria').value='2';old.resolve({data:[{id:9,titulo:'Antigua'}],error:null});await first;
+ assert.equal(d.getElementById('productoCategoria').value,'2');assert.equal(d.querySelector('#productoCategoria option[value="9"]'),null);
+ }finally{old.resolve({data:[],error:null});dom.window.close()}
+});
+test('category options from a dismissed editor cannot change the newly opened editor',async()=>{
+ const old=deferredAdmin();let count=0;
+ const {dom,w,d}=await admin(()=>++count===1?old.promise:{data:categoryOptions,error:null});try{
+ w.openProductoModal();await settleAdmin();w.closeProductoModal();w.openProductoModal();await settleAdmin();
+ d.getElementById('productoCategoria').value='2';old.resolve({data:[{id:9,titulo:'Antigua'}],error:null});await settleAdmin();
+ assert.equal(d.getElementById('productoCategoria').value,'2');assert.equal(d.getElementById('productoCategoriaStatus').hidden,true);
+ }finally{old.resolve({data:[],error:null});dom.window.close()}
+});
+test('a loaded product retains its category while the option list is still pending',async()=>{
+ const options=deferredAdmin();
+ const {dom,w,d}=await admin(req=>req.table==='categorias'?options.promise:{data:req.table==='productos'?{...hammer,categoria_id:2}:[],error:null});try{
+ w.openProductoModal(7);await settleAdmin();
+ assert.equal(d.getElementById('productoCategoria').value,'2','loading options must not erase the product category');
+ options.resolve({data:categoryOptions,error:null});await settleAdmin();
+ assert.equal(d.getElementById('productoCategoria').value,'2');assert.equal(d.getElementById('productoCategoria').validity.valid,true);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{options.resolve({data:[],error:null});dom.window.close()}
+});
+test('a category missing from a refresh is retained visibly but cannot be saved or unassigned',async()=>{
+ let options=categoryOptions;
+ const {dom,w,d,calls}=await admin(req=>({data:req.table==='categorias'?options:req.table==='productos'?hammer:[],error:null}));try{
+ w.openProductoModal(7);await settleAdmin();options=[categoryOptions[1]];await w.loadCategoriasSelect();
+ assert.equal(d.getElementById('productoCategoria').value,'1');assert.equal(d.getElementById('productoCategoria').validity.valid,false);
+ assert.match(d.getElementById('productoCategoriaStatus').textContent,/no.*disponible/i);
+ d.getElementById('productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await settleAdmin();
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ d.getElementById('productoCategoria').value='2';d.getElementById('productoCategoria').dispatchEvent(new w.Event('change'));
+ assert.equal(d.getElementById('productoCategoria').validity.valid,true);
+ }finally{dom.window.close()}
+});
+test('an empty category list explains how to recover and never permits a categoryless write',async()=>{
+ const {dom,w,d,calls}=await admin(()=>({data:[],error:null}));try{
+ w.openProductoModal();await settleAdmin();
+ const status=d.getElementById('productoCategoriaStatus');assert.ok(status&&!status.hidden);assert.match(status.textContent,/crea.*categoría/i);
+ assert.equal(d.getElementById('retryProductoCategorias').hidden,false);
+ d.getElementById('productoImagenUrl').value='img/logo.jpeg';d.getElementById('productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await settleAdmin();
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ }finally{dom.window.close()}
+});
+test('failed filtered product loading removes stale actions and offers a retry for that filter',async()=>{
+ let fail=false;const {dom,w,d,calls}=await admin(req=>req.table==='categorias'?{data:{id:2,titulo:'Pinturas'},error:null}:fail?{data:null,error:{message:'offline'}}:{data:req.filters.length?[paint]:[hammer],error:null});try{
+ await w.loadProductos();fail=true;await w.loadProductos(2);
+ assert.equal(d.querySelectorAll('#productosTableBody button').length,0,'old rows must not stay actionable after the filter fails');
+ assert.doesNotMatch(d.getElementById('productosTableBody').textContent,/Martillo/);
+ const status=d.getElementById('productosLoadStatus');assert.ok(status&&!status.hidden);assert.match(status.textContent,/No se pudieron cargar/i);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ fail=false;d.getElementById('retryProductos').click();await settleAdmin();
+ assert.equal(d.getElementById('sectionTitle').textContent,'Productos: Pinturas');assert.match(d.getElementById('productosTableBody').textContent,/Pintura/);
+ assert.deepEqual(calls.filter(req=>req.table==='productos').at(-1).filters,[['categoria_id',2]]);
+ }finally{dom.window.close()}
+});
+test('product loading removes stale actions immediately before the new response arrives',async()=>{
+ const next=deferredAdmin();let count=0;
+ const {dom,w,d}=await admin(req=>req.table==='categorias'?{data:{titulo:'Pinturas'},error:null}:++count===1?{data:[hammer],error:null}:next.promise);try{
+ await w.loadProductos();const pending=w.loadProductos(2);await settleAdmin();
+ assert.equal(d.querySelectorAll('#productosTableBody button').length,0);
+ assert.equal(d.getElementById('productosSection').getAttribute('aria-busy'),'true');
+ assert.match(d.getElementById('productosLoadStatus').textContent,/Cargando/i);
+ next.resolve({data:[paint],error:null});await pending;assert.equal(d.getElementById('productosSection').getAttribute('aria-busy'),'false');
+ }finally{next.resolve({data:[],error:null});await settleAdmin();dom.window.close()}
+});
+for (const [label,response] of [
+ ['success',{data:[paint],error:null}],['failure',{data:null,error:{message:'old offline'}}]
+]) test(`obsolete filtered product ${label} cannot replace the latest all-products view`,async()=>{
+ const old=deferredAdmin();const {dom,w,d,alerts}=await admin(req=>req.table==='categorias'?{data:{titulo:'Pinturas'},error:null}:req.filters.length?old.promise:{data:[hammer],error:null});try{
+ const pending=w.loadProductos(2);await settleAdmin();await w.loadProductos();old.resolve(response);await pending;
+ assert.equal(d.getElementById('sectionTitle').textContent,'Todos los Productos');assert.match(d.getElementById('productosTableBody').textContent,/Martillo/);
+ assert.doesNotMatch(d.getElementById('productosTableBody').textContent,/Pintura/);assert.equal(alerts.length,0);
+ assert.equal(d.getElementById('productosLoadStatus').hidden,true);assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{old.resolve({data:[],error:null});dom.window.close()}
+});
+test('late product category titles cannot overwrite the current section heading',async()=>{
+ const title=deferredAdmin();const {dom,w,d}=await admin(req=>req.table==='productos'?{data:[paint],error:null}:req.columns==='titulo'?title.promise:{data:[],error:null});try{
+ const pending=w.loadProductos(2);await settleAdmin();w.switchSection('categorias');await settleAdmin();
+ title.resolve({data:{titulo:'Pinturas'},error:null});await pending;
+ assert.equal(d.getElementById('sectionTitle').textContent,'Categorías');assert.equal(d.getElementById('categoriasSection').classList.contains('active'),true);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{title.resolve({data:null,error:null});dom.window.close()}
+});
+test('schema mismatch reports a safe diagnosis without prescribing unreviewed SQL',async()=>{
+ const {dom,w,d,alerts}=await admin(()=>({data:null,error:{message:'column "categoria_id" does not exist'}}));try{
+ await w.loadProductos();
+ assert.equal(alerts.some(message=>/ejecut|update-schema/i.test(message)),false);
+ const status=d.getElementById('productosLoadStatus');assert.ok(status&&!status.hidden);assert.match(status.textContent,/configuración|base de datos/i);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{dom.window.close()}
+});
+test('category list failure removes stale actions and supports retry',async()=>{
+ let fail=false;const {dom,w,d}=await admin(()=>fail?{data:null,error:{message:'offline'}}:{data:categoryOptions,error:null});try{
+ await w.loadCategorias();fail=true;await w.loadCategorias();assert.equal(d.querySelectorAll('#categoriasTableBody button').length,0);
+ const status=d.getElementById('categoriasLoadStatus');assert.ok(status&&!status.hidden);
+ fail=false;d.getElementById('retryCategorias').click();await settleAdmin();assert.match(d.getElementById('categoriasTableBody').textContent,/Herramientas/);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{dom.window.close()}
+});
+test('obsolete category list responses cannot replace a newer list',async()=>{
+ const old=deferredAdmin();let count=0;const {dom,w,d}=await admin(()=>++count===1?old.promise:{data:categoryOptions,error:null});try{
+ const pending=w.loadCategorias();await settleAdmin();await w.loadCategorias();old.resolve({data:[{id:9,titulo:'Vieja'}],error:null});await pending;
+ assert.match(d.getElementById('categoriasTableBody').textContent,/Herramientas/);assert.doesNotMatch(d.getElementById('categoriasTableBody').textContent,/Vieja/);
+ assert.equal(d.getElementById('loadingOverlay').style.display,'none');
+ }finally{old.resolve({data:[],error:null});dom.window.close()}
+});
 test('session lookup failure shows login error and releases loading overlay',async()=>{
  const {dom,w,d}=await admin();try{
  assert.equal(typeof w.initializeAdmin,'function');
@@ -264,8 +420,9 @@ test('blanking an existing variant title never implicitly deletes it',async()=>{
  }finally{dom.window.close()}
 });
 test('invalid variant titles are rejected before saving the parent product',async()=>{
- const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d,calls}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  w.openProductoModal();w.addVariantRow({titulo:'  '});d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';
+ await chooseProductCategory(w,d);
  d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));assert.equal(calls.filter(req=>req.action!=='select').length,0);
  }finally{dom.window.close()}
 });
@@ -298,8 +455,9 @@ test('valid uploaded image uses its normalized extension',async()=>{
  }finally{dom.window.close()}
 });
 test('failed variant upload does not save the parent product first',async()=>{
- const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d,calls}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  w.openProductoModal();w.addVariantRow({titulo:'New'});Object.defineProperty(d.querySelector('.variant-file-input'),'files',{value:[new File([Uint8Array.from([255,216,255])],'photo.jpg',{type:'image/jpeg'})]});w.uploadImage=async()=>{throw Error('upload failed')};
+ await chooseProductCategory(w,d);
  d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));assert.equal(calls.filter(req=>req.action!=='select').length,0);
  }finally{dom.window.close()}
 });
@@ -311,8 +469,9 @@ test('all category images are validated before uploading the first one',async()=
  }finally{dom.window.close()}
 });
 test('invalid main product image prevents uploading variant images first',async()=>{
- const {dom,w,d}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  let uploads=0;w.uploadImage=async()=>{uploads++;return'https://example.test/image.jpg'};w.openProductoModal();w.addVariantRow({titulo:'Valid option'});
+ await chooseProductCategory(w,d);
  Object.defineProperty(d.querySelector('.variant-file-input'),'files',{value:[new File([Uint8Array.from([255,216,255])],'photo.jpg',{type:'image/jpeg'})]});Object.defineProperty(d.querySelector('#productoImagen'),'files',{value:[new File(['bad'],'bad.txt',{type:'text/plain'})]});
  d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));assert.equal(uploads,0);
  }finally{dom.window.close()}
@@ -348,8 +507,9 @@ test('valid technical sheet upload uses a normalized extension and preserves the
  }finally{dom.window.close()}
 });
 test('invalid technical sheet blocks every upload and product or variant write',async()=>{
- const {dom,w,d,calls,alerts}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d,calls,alerts}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  const uploads=recordStorageUploads(w);w.openProductoModal();w.addVariantRow({titulo:'Valid option'});
+ await chooseProductCategory(w,d);
  const picture=new File([Uint8Array.from([255,216,255])],'photo.jpg',{type:'image/jpeg'});
  Object.defineProperty(d.querySelector('#productoImagen'),'files',{value:[picture]});
  Object.defineProperty(d.querySelector('.variant-file-input'),'files',{value:[picture]});
@@ -362,8 +522,9 @@ test('invalid technical sheet blocks every upload and product or variant write',
  }finally{dom.window.close()}
 });
 test('a corrected technical sheet can be saved after validation fails',async()=>{
- const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d,calls}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  const uploads=recordStorageUploads(w);w.openProductoModal();d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';
+ await chooseProductCategory(w,d);
  let selected=[new File([],'sheet.pdf',{type:'application/pdf'})];
  Object.defineProperty(d.querySelector('#productoFichaFile'),'files',{get:()=>selected});
  d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
@@ -376,8 +537,9 @@ test('a corrected technical sheet can be saved after validation fails',async()=>
  }finally{dom.window.close()}
 });
 test('saving without a replacement technical sheet preserves its existing reference',async()=>{
- const {dom,w,d,calls}=await admin(()=>({data:{id:1},error:null}));try{
+ const {dom,w,d,calls}=await admin(withAvailableCategories(()=>({data:{id:1},error:null})));try{
  const uploads=recordStorageUploads(w);w.openProductoModal();d.querySelector('#productoId').value='1';d.querySelector('#productoImagenUrl').value='img/logo.jpeg';d.querySelector('#productoFicha').value='https://example.test/existing.pdf';
+ await chooseProductCategory(w,d);
  d.querySelector('#productoForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,10));
  assert.equal(uploads.length,0);assert.equal(calls.find(req=>req.table==='productos'&&req.action==='update').payload.ficha_tecnica,'https://example.test/existing.pdf');
  }finally{dom.window.close()}
@@ -439,8 +601,9 @@ function pressAdminKey(w,target,key,options={}) {
 for (const kind of ['Producto','Categoria']) {
  const prefix=kind.toLowerCase();
  test(`${prefix} dialog traps Tab at both boundaries but keeps normal field navigation`,async()=>{
-  const {dom,w,d}=await admin();try{
+  const {dom,w,d}=await admin(withAvailableCategories());try{
    w[`open${kind}Modal`]();
+   if (kind==='Producto') await chooseProductCategory(w,d);
    const modal=d.getElementById(`${prefix}Modal`);
    const first=modal.querySelector('.modal-close');const last=modal.querySelector('[type="submit"]');
    const hidden=d.createElement('button');hidden.hidden=true;modal.append(hidden);
@@ -456,6 +619,7 @@ for (const kind of ['Producto','Categoria']) {
  test(`${prefix} dialog recovers escaped focus and handles no tabbable controls`,async()=>{
   const {dom,w,d}=await admin();try{
    w[`open${kind}Modal`]();const modal=d.getElementById(`${prefix}Modal`);
+   await settleAdmin();
    const outside=d.getElementById('loginEmail');outside.focus();
    assert.equal(pressAdminKey(w,outside,'Tab').defaultPrevented,true);
    assert.equal(d.activeElement,modal.querySelector('.modal-close'));
@@ -475,12 +639,12 @@ for (const kind of ['Producto','Categoria']) {
  });
  test(`${prefix} pending save blocks Escape, backdrop and direct dismissal without releasing the focus trap`,async()=>{
   let resolve;const pending=new Promise(r=>resolve=r);
-  const {dom,w,d,calls}=await admin(req=>req.action==='update'?pending:{data:[],error:null});try{
+  const {dom,w,d,calls}=await admin(withAvailableCategories(req=>req.action==='update'?pending:{data:[],error:null}));try{
    d.getElementById('adminDashboard').style.display='grid';
    const trigger=d.getElementById('addNewBtn');trigger.focus();w[`open${kind}Modal`]();
    const modal=d.getElementById(`${prefix}Modal`);const form=d.getElementById(`${prefix}Form`);
    d.getElementById(`${prefix}Id`).value='1';
-   if (kind==='Producto') d.getElementById('productoImagenUrl').value='img/logo.jpeg';
+   if (kind==='Producto') {d.getElementById('productoImagenUrl').value='img/logo.jpeg';await chooseProductCategory(w,d)}
    else d.getElementById('categoriaImagenesUrls').value='a||b||c||d';
    form.dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
    assert.equal(calls.filter(req=>req.action==='update').length,1);
@@ -499,11 +663,11 @@ for (const kind of ['Producto','Categoria']) {
 for (const kind of ['Producto','Categoria']) {
  const prefix=kind.toLowerCase();
  test(`${prefix} successful save keeps focus useful when the refreshed table replaces its trigger`,async()=>{
-  const {dom,w,d}=await admin(req=>({data:req.action==='select'?[]:{id:1},error:null}));try{
+  const {dom,w,d}=await admin(withAvailableCategories(req=>({data:req.action==='select'?[]:{id:1},error:null})));try{
    d.getElementById('adminDashboard').style.display='grid';
    const trigger=d.createElement('button');d.getElementById(`${prefix}sTableBody`).append(trigger);trigger.focus();
    w[`open${kind}Modal`]();d.getElementById(`${prefix}Id`).value='1';
-   if (kind==='Producto') d.getElementById('productoImagenUrl').value='img/logo.jpeg';
+   if (kind==='Producto') {d.getElementById('productoImagenUrl').value='img/logo.jpeg';await chooseProductCategory(w,d)}
    else d.getElementById('categoriaImagenesUrls').value='a||b||c||d';
    d.getElementById(`${prefix}Form`).dispatchEvent(new w.Event('submit',{cancelable:true}));
    await new Promise(r=>setTimeout(r,10));

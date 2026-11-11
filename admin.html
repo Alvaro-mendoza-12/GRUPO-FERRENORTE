@@ -96,6 +96,10 @@
 
             <!-- Productos Section -->
             <section id="productosSection" class="content-section active">
+                <div id="productosLoadStatus" class="admin-load-status" role="status" aria-live="polite" hidden>
+                    <span id="productosLoadMessage"></span>
+                    <button id="retryProductos" type="button" class="btn btn-secondary" hidden>Reintentar productos</button>
+                </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -120,6 +124,10 @@
 
             <!-- Categorías Section -->
             <section id="categoriasSection" class="content-section">
+                <div id="categoriasLoadStatus" class="admin-load-status" role="status" aria-live="polite" hidden>
+                    <span id="categoriasLoadMessage"></span>
+                    <button id="retryCategorias" type="button" class="btn btn-secondary" hidden>Reintentar categorías</button>
+                </div>
                 <div class="table-container">
                     <table class="data-table">
                         <thead>
@@ -209,10 +217,14 @@
 
                 <div class="form-group">
                     <label for="productoCategoria">Categoría *</label>
-                    <select id="productoCategoria" required>
+                    <select id="productoCategoria" required aria-describedby="productoCategoriaMessage">
                         <option value="">Selecciona una categoría...</option>
                         <!-- Se llenará dinámicamente con JS -->
                     </select>
+                    <div id="productoCategoriaStatus" class="admin-load-status" role="status" aria-live="polite" hidden>
+                        <span id="productoCategoriaMessage"></span>
+                        <button id="retryProductoCategorias" type="button" class="btn btn-secondary" hidden>Reintentar categorías</button>
+                    </div>
                 </div>
 
                 <div class="form-group">

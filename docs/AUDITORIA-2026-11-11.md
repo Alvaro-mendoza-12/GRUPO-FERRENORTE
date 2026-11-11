@@ -113,3 +113,11 @@ Verificación final de este lote: 168 pruebas locales aprobadas, sintaxis, build
 El usuario rechazó el diseño anterior, especialmente la paleta. Se sustituyó el sistema visual público por una base blanca/carbón con acento verde pino, buscador protagonista, tarjetas uniformes y contenido comercial más directo. La investigación, decisiones y alcance de QA están en `REDISENO-CATALOGO-2026-11-11.md`.
 
 Verificación: 173 pruebas, sintaxis, build y revisión independiente; además navegador real con catálogo simulado, búsqueda, variantes, cantidades, cotización interceptada y anchos 390/768 px en marcos de prueba. Se detectaron y corrigieron tarjetas invisibles por animación e imágenes verticales con alturas irregulares. No se enviaron mensajes, no se probó Supabase real y no hubo despliegue. Este rediseño se entrega primero en `dot/ferrenorte-storefront`; no se integra automáticamente al borrador ni a `main`.
+
+## Recuperación de cargas administrativas
+
+Los selectores de categoría ahora muestran carga/error y permiten reintentar; al reabrir el editor se vuelve a comprobar la lista y se conserva la asignación previa. No se permite guardar con categorías pendientes, fallidas o inválidas.
+
+Los listados retiran las acciones de filas anteriores al recargar o fallar y descartan respuestas obsoletas, incluidos cambios de sección. El reintento conserva el filtro; el título y los resultados ya no representan consultas distintas. Se retiró el aviso que recomendaba ejecutar SQL sin una revisión del esquema.
+
+Verificación del lote: 189 pruebas locales aprobadas y revisión independiente de carreras/reintentos, sin bloqueadores. No se modificaron políticas, SQL ni datos reales. Auditoría npm: cero vulnerabilidades reportadas; no cubre CDN ni permisos reales. El rediseño sigue sin integrarse al borrador mientras se revisa la referencia visual del usuario.

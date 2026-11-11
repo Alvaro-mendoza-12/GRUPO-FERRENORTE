@@ -86,6 +86,12 @@ let loadedVariantIds = [];
 let variantsReady = false;
 let productSaveInProgress = false;
 let currentCategoryFilter = null; // Para filtrar productos por categoría
+let adminSectionVersion = 0;
+let productsLoadVersion = 0;
+let categoriesLoadVersion = 0;
+let categoryOptionsLoadVersion = 0;
+let categoryOptionsReady = false;
+let availableProductCategoryIds = new Set();
 
 // ===========================
 // AUTENTICACIÓN
@@ -271,6 +277,7 @@ document.querySelectorAll('.nav-item[data-section]').forEach(item => {
 });
 
 function switchSection(section) {
+    adminSectionVersion++;
     currentSection = section;
 
     // Actualizar navegación activa
@@ -293,15 +300,7 @@ function switchSection(section) {
     };
 
     if (section === 'productos') {
-        if (currentCategoryFilter) {
-            // Obtener nombre de la categoría para el título
-            // Esto es un poco hacky sin hacer otra consulta, pero funcional
-            document.getElementById('sectionTitle').textContent = `Productos de la Categoría (Filtrado)`; // Se actualizará mejor si consultamos
-            loadProductos(currentCategoryFilter);
-        } else {
-            document.getElementById('sectionTitle').textContent = titles[section];
-            loadProductos();
-        }
+        loadProductos(currentCategoryFilter);
     } else if (section === 'categorias') {
         document.getElementById('sectionTitle').textContent = titles[section];
         loadCategorias();
@@ -488,26 +487,99 @@ document.addEventListener('paste', (e) => {
 // ===========================
 
 // Cargar categorías para el select del modal de productos
+function setProductCategoryStatus(state, message = '') {
+    const status = document.getElementById('productoCategoriaStatus');
+    status.hidden = !message;
+    status.dataset.state = state;
+    document.getElementById('productoCategoriaMessage').textContent = message;
+    document.getElementById('retryProductoCategorias').hidden = state !== 'error';
+    const select = document.getElementById('productoCategoria');
+    select.disabled = !categoryOptionsReady;
+    select.setAttribute('aria-busy', String(state === 'loading'));
+    document.querySelector('#productoForm [type="submit"]').disabled = !categoryOptionsReady;
+}
+
+function setProductCategorySelection(categoryId) {
+    const select = document.getElementById('productoCategoria');
+    const value = categoryId == null ? '' : String(categoryId);
+    // Preserve an existing assignment even before its options arrive, or if it
+    // disappears from a refresh. Never silently replace it with null on save.
+    if (value && ![...select.options].some(option => option.value === value)) {
+        const option = new Option(`Categoría no disponible (${value})`, value);
+        option.disabled = true;
+        select.add(option);
+    }
+    select.value = value;
+    const unavailable = value && !availableProductCategoryIds.has(value);
+    select.setCustomValidity(unavailable ? 'La categoría no está disponible. Reintenta la carga o elige otra categoría.' : '');
+    if (categoryOptionsReady) {
+        setProductCategoryStatus(unavailable ? 'error' : 'ready', unavailable
+            ? 'La categoría asignada no está disponible. Reintenta la carga o elige otra categoría antes de guardar.' : '');
+    }
+}
+
+document.getElementById('productoCategoria').addEventListener('change', event => {
+    setProductCategorySelection(event.target.value);
+});
+document.getElementById('retryProductoCategorias').addEventListener('click', () => loadCategoriasSelect());
+
 async function loadCategoriasSelect() {
+    if (productSaveInProgress) return;
+    const version = ++categoryOptionsLoadVersion;
+    const editorVersion = productEditorVersion;
+    const isCurrent = () => version === categoryOptionsLoadVersion && editorVersion === productEditorVersion;
+    categoryOptionsReady = false;
+    setProductCategoryStatus('loading', 'Cargando categorías…');
     try {
         const { data, error } = await supabaseClient
             .from('categorias')
             .select('id, titulo')
             .order('titulo');
 
+        if (!isCurrent()) return;
         if (error) throw error;
-
+        if (!Array.isArray(data) || data.some(cat => cat?.id == null)) throw new Error('Lista de categorías no válida');
         const select = document.getElementById('productoCategoria');
-        select.innerHTML = '<option value="">Selecciona una categoría...</option>';
+        const selectedId = select.value;
+        select.replaceChildren(new Option('Selecciona una categoría...', ''));
         data.forEach(cat => {
-            select.innerHTML += `<option value="${cat.id}">${escapeAdminHTML(cat.titulo)}</option>`;
+            select.add(new Option(String(cat.titulo ?? ''), String(cat.id)));
         });
+        availableProductCategoryIds = new Set(data.map(cat => String(cat.id)));
+        categoryOptionsReady = data.length > 0;
+        setProductCategorySelection(selectedId);
+        if (!categoryOptionsReady) {
+            setProductCategoryStatus('error', 'No hay categorías disponibles. Crea una categoría en la sección Categorías y vuelve a intentarlo.');
+        }
     } catch (error) {
+        if (!isCurrent()) return;
         console.error('Error cargando lista de categorías:', error);
+        setProductCategoryStatus('error', 'No se pudieron cargar las categorías. Comprueba tu conexión y vuelve a intentarlo.');
+    }
+}
+
+function setAdminListState(kind, state, message = '', retry = null) {
+    const status = document.getElementById(`${kind}LoadStatus`);
+    status.hidden = state === 'ready';
+    status.dataset.state = state;
+    document.getElementById(`${kind}LoadMessage`).textContent = message;
+    const retryButton = document.getElementById(kind === 'productos' ? 'retryProductos' : 'retryCategorias');
+    retryButton.hidden = state !== 'error';
+    retryButton.onclick = retry;
+    document.getElementById(`${kind}Section`).setAttribute('aria-busy', String(state === 'loading'));
+    if (state !== 'ready') {
+        const tbody = document.getElementById(`${kind}TableBody`);
+        if (tbody.contains(document.activeElement)) document.getElementById('addNewBtn').focus();
+        tbody.replaceChildren();
     }
 }
 
 async function loadProductos(categoriaId = null) {
+    const version = ++productsLoadVersion;
+    const sectionVersion = adminSectionVersion;
+    const isCurrent = () => version === productsLoadVersion && sectionVersion === adminSectionVersion;
+    setAdminListState('productos', 'loading', 'Cargando productos…');
+    if (currentSection === 'productos') document.getElementById('sectionTitle').textContent = 'Productos';
     showLoading();
     try {
         let query = supabaseClient
@@ -517,29 +589,32 @@ async function loadProductos(categoriaId = null) {
 
         if (categoriaId) {
             query = query.eq('categoria_id', categoriaId);
-
-            // Obtener nombre de la categoría para el título
-            const { data: cat } = await supabaseClient.from('categorias').select('titulo').eq('id', categoriaId).single();
-            if (cat) document.getElementById('sectionTitle').textContent = `Productos: ${cat.titulo}`;
-        } else {
-            document.getElementById('sectionTitle').textContent = 'Todos los Productos';
         }
-
-        const { data, error } = await query;
-
+        const categoryQuery = categoriaId
+            ? supabaseClient.from('categorias').select('titulo').eq('id', categoriaId).single()
+            : Promise.resolve({ data: null, error: null });
+        const [{ data, error }, categoryResult] = await Promise.all([query, categoryQuery]);
+        if (!isCurrent()) return;
         if (error) throw error;
-
+        if (categoryResult.error) throw categoryResult.error;
+        if (!Array.isArray(data)) throw new Error('Lista de productos no válida');
         renderProductosTable(data);
-    } catch (error) {
-        console.error('Error cargando productos:', error);
-        // No mostrar alert si es error de columna no encontrada (usuario no ha corrido SQL)
-        if (error.message && error.message.includes('column "categoria_id" does not exist')) {
-            alert('⚠️ IMPORTANTE: Debes ejecutar el script "update-schema.sql" en Supabase para habilitar las categorías en productos.');
-        } else {
-            alert('Error al cargar productos');
+        if (currentSection === 'productos') {
+            document.getElementById('sectionTitle').textContent = categoriaId
+                ? (categoryResult.data?.titulo ? `Productos: ${categoryResult.data.titulo}` : 'Productos de la categoría seleccionada')
+                : 'Todos los Productos';
         }
+        setAdminListState('productos', 'ready');
+    } catch (error) {
+        if (!isCurrent()) return;
+        console.error('Error cargando productos:', error);
+        const message = error.message?.includes('column "categoria_id" does not exist')
+            ? 'No se pudieron cargar los productos. La base de datos no reconoce la categoría del producto. Solicita una revisión de la configuración antes de modificarla.'
+            : 'No se pudieron cargar los productos. Comprueba tu conexión y vuelve a intentarlo.';
+        setAdminListState('productos', 'error', message, () => loadProductos(categoriaId));
+    } finally {
+        hideLoading();
     }
-    hideLoading();
 }
 
 function renderProductosTable(productos) {
@@ -624,12 +699,8 @@ function openProductoModal(productoId = null) {
     document.getElementById('productoImagenPreview').innerHTML = '';
     document.getElementById('fichaFileStatus').textContent = '';
     document.getElementById('productoModalTitle').textContent = 'Agregar Producto';
-
-    // Si estamos filtrando por categoría, pre-seleccionar esa categoría
-    if (currentCategoryFilter) {
-        const select = document.getElementById('productoCategoria');
-        if (select) select.value = currentCategoryFilter;
-    }
+    setProductCategorySelection(currentCategoryFilter);
+    loadCategoriasSelect();
 
     if (productoId) {
         loadProductoData(productoId);
@@ -671,8 +742,7 @@ async function loadProductoData(id, version = productEditorVersion) {
         document.getElementById('productoFicha').value = data.ficha_tecnica || '';
 
         // Cargar categoría
-        const select = document.getElementById('productoCategoria');
-        if (select && data.categoria_id) select.value = data.categoria_id;
+        setProductCategorySelection(data.categoria_id);
 
         const previewContainer = document.getElementById('productoImagenPreview');
         previewContainer.innerHTML = `<div class="preview-item"><img src="${escapeAdminHTML(data.imagen_url)}" alt="${escapeAdminHTML(data.titulo)}"></div>`;
@@ -769,6 +839,11 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
     if (productSaveInProgress) return;
     if (productWriteUncertain) { alert('Comprueba el catálogo y vuelve a abrir el registro antes de reintentar un guardado sin confirmar.'); return; }
     if (!variantsReady) { alert('No se cargaron las variantes. Vuelve a abrir el producto antes de guardar.'); return; }
+    const selectedCategory = document.getElementById('productoCategoria').value;
+    if (!categoryOptionsReady || !availableProductCategoryIds.has(selectedCategory)) {
+        alert('Carga las categorías y selecciona una categoría disponible antes de guardar.');
+        return;
+    }
     try { validateVariantTitles(); } catch (error) { alert('Error: ' + error.message); return; }
     const id = document.getElementById('productoId').value;
     const imagenFile = document.getElementById('productoImagen').files[0];
@@ -797,7 +872,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
             titulo: document.getElementById('productoTitulo').value,
             descripcion: document.getElementById('productoDescripcion').value,
             imagen_url: imagenUrl,
-            categoria_id: document.getElementById('productoCategoria').value || null,
+            categoria_id: selectedCategory,
             badge: document.getElementById('productoBadge').value,
             badge_color: document.getElementById('productoBadgeColor').value,
             orden: parseInt(document.getElementById('productoOrden').value),
@@ -878,16 +953,28 @@ async function saveVariantes(productoId) {
 // ===========================
 
 async function loadCategorias() {
+    const version = ++categoriesLoadVersion;
+    const sectionVersion = adminSectionVersion;
+    const isCurrent = () => version === categoriesLoadVersion && sectionVersion === adminSectionVersion;
+    setAdminListState('categorias', 'loading', 'Cargando categorías…');
     showLoading();
     try {
         const { data, error } = await supabaseClient
             .from('categorias')
             .select('*, categoria_imagenes(count)')
             .order('orden', { ascending: true });
+        if (!isCurrent()) return;
         if (error) throw error;
+        if (!Array.isArray(data)) throw new Error('Lista de categorías no válida');
         renderCategoriasTable(data);
-    } catch (error) { console.error(error); alert('Error al cargar categorías'); }
-    hideLoading();
+        setAdminListState('categorias', 'ready');
+    } catch (error) {
+        if (!isCurrent()) return;
+        console.error(error);
+        setAdminListState('categorias', 'error', 'No se pudieron cargar las categorías. Comprueba tu conexión y vuelve a intentarlo.', () => loadCategorias());
+    } finally {
+        hideLoading();
+    }
 }
 
 // Función para ver productos de una categoría específica

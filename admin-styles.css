@@ -892,6 +892,36 @@ textarea:focus-visible {
 }
 
 /* Actualización visual compartida con la web pública. */
+.admin-load-status {
+    display: flex;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 12px 0;
+    padding: 14px 16px;
+    border: 1px solid var(--gray-300);
+    border-radius: 10px;
+    background: var(--gray-50);
+    color: var(--gray-700);
+}
+
+.admin-load-status[hidden],
+.admin-load-status button[hidden] {
+    display: none;
+}
+
+.admin-load-status[data-state="error"] {
+    border-color: #f0c485;
+    background: #fff7ed;
+    color: #7c2d12;
+}
+
+.btn:disabled,
+select:disabled {
+    cursor: not-allowed;
+    opacity: 0.65;
+}
+
 :root {
     --primary-blue: #173b6c;
     --primary-orange: #d97706;
