@@ -184,12 +184,13 @@
     <div id="adminSidebarBackdrop" class="admin-sidebar-backdrop"></div>
 
     <!-- Modal para Producto -->
-    <div id="productoModal" class="modal">
+    <div id="productoModal" class="modal" role="dialog" aria-modal="true"
+        aria-labelledby="productoModalTitle" aria-hidden="true" tabindex="-1" hidden inert>
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="productoModalTitle">Agregar Producto</h2>
-                <button class="modal-close" onclick="closeProductoModal()">
-                    <i class="fas fa-times"></i>
+                <button type="button" class="modal-close" aria-label="Cerrar editor de producto" onclick="closeProductoModal()">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             <form id="productoForm" class="modal-form">
@@ -310,12 +311,13 @@
     </div>
 
     <!-- Modal para Categoría -->
-    <div id="categoriaModal" class="modal">
+    <div id="categoriaModal" class="modal" role="dialog" aria-modal="true"
+        aria-labelledby="categoriaModalTitle" aria-hidden="true" tabindex="-1" hidden inert>
         <div class="modal-content">
             <div class="modal-header">
                 <h2 id="categoriaModalTitle">Agregar Categoría</h2>
-                <button class="modal-close" onclick="closeCategoriaModal()">
-                    <i class="fas fa-times"></i>
+                <button type="button" class="modal-close" aria-label="Cerrar editor de categoría" onclick="closeCategoriaModal()">
+                    <i class="fas fa-times" aria-hidden="true"></i>
                 </button>
             </div>
             <form id="categoriaForm" class="modal-form">

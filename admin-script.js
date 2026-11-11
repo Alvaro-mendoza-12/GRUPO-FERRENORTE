@@ -229,6 +229,26 @@ window.addEventListener('resize', () => {
 });
 
 document.addEventListener('keydown', (e) => {
+    if (e.defaultPrevented || e.isComposing) return;
+    const modal = document.querySelector('.modal.active:not([hidden])');
+    if (modal) {
+        if (e.key === 'Escape') {
+            e.preventDefault();
+            if (modal.id === 'productoModal') closeProductoModal();
+            else closeCategoriaModal();
+        } else if (e.key === 'Tab') {
+            const controls = [...modal.querySelectorAll('button, a[href], input, select, textarea, [tabindex], [contenteditable="true"]')]
+                .filter(canReceiveAdminFocus);
+            const first = controls[0];
+            const last = controls[controls.length - 1];
+            const current = document.activeElement;
+            if (!controls.length || !controls.includes(current) || (e.shiftKey ? current === first : current === last)) {
+                e.preventDefault();
+                (e.shiftKey ? last || modal : first || modal).focus();
+            }
+        }
+        return;
+    }
     if (e.key === 'Escape') closeMobileSidebar();
 });
 
@@ -524,6 +544,8 @@ async function loadProductos(categoriaId = null) {
 
 function renderProductosTable(productos) {
     const tbody = document.getElementById('productosTableBody');
+    // Saving can restore focus to an edit button that this refresh is about to remove.
+    if (tbody.contains(document.activeElement)) document.getElementById('addNewBtn').focus();
 
     if (!productos?.length) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--gray-600);">No hay productos registrados (en esta vista)</td></tr>';
@@ -550,6 +572,40 @@ function renderProductosTable(productos) {
     `).join('');
     tbody.querySelectorAll('[data-action=edit-product]').forEach((button, index) => button.addEventListener('click', () => editProducto(productos[index].id)));
     tbody.querySelectorAll('[data-action=delete-product]').forEach((button, index) => button.addEventListener('click', () => deleteProducto(productos[index].id, productos[index].titulo)));
+}
+
+const adminDialogTriggers = new WeakMap();
+
+function canReceiveAdminFocus(element) {
+    if (!element?.isConnected || element.matches(':disabled, input[type="hidden"]') || element.tabIndex < 0) return false;
+    for (let node = element; node; node = node.parentElement) {
+        if (node.hidden || node.inert || node.hasAttribute('inert')) return false;
+        const style = window.getComputedStyle(node);
+        if (style.display === 'none' || style.visibility === 'hidden' || style.visibility === 'collapse') return false;
+    }
+    return true;
+}
+
+function showAdminDialog(modal, initialFocusId) {
+    if (!modal.classList.contains('active')) adminDialogTriggers.set(modal, document.activeElement);
+    modal.hidden = false;
+    modal.removeAttribute('inert');
+    modal.setAttribute('aria-hidden', 'false');
+    modal.classList.add('active');
+    document.getElementById(initialFocusId).focus();
+}
+
+function hideAdminDialog(modal) {
+    if (!modal.classList.contains('active')) return;
+    const trigger = adminDialogTriggers.get(modal);
+    const target = canReceiveAdminFocus(trigger) ? trigger : document.getElementById('addNewBtn');
+    if (canReceiveAdminFocus(target)) target.focus();
+    if (modal.contains(document.activeElement)) document.activeElement.blur();
+    modal.classList.remove('active');
+    modal.hidden = true;
+    modal.setAttribute('aria-hidden', 'true');
+    modal.setAttribute('inert', '');
+    adminDialogTriggers.delete(modal);
 }
 
 function openProductoModal(productoId = null) {
@@ -579,13 +635,13 @@ function openProductoModal(productoId = null) {
         loadProductoData(productoId);
     }
 
-    modal.classList.add('active');
+    showAdminDialog(modal, 'productoTitulo');
 }
 
 function closeProductoModal() {
     if (productSaveInProgress) return;
     productEditorVersion++;
-    document.getElementById('productoModal').classList.remove('active');
+    hideAdminDialog(document.getElementById('productoModal'));
 }
 
 async function loadProductoData(id, version = productEditorVersion) {
@@ -842,6 +898,7 @@ async function verProductosDeCategoria(id) {
 
 function renderCategoriasTable(categorias) {
     const tbody = document.getElementById('categoriasTableBody');
+    if (tbody.contains(document.activeElement)) document.getElementById('addNewBtn').focus();
     if (!categorias?.length) {
         tbody.innerHTML = '<tr><td colspan="8">No hay categorías</td></tr>';
         return;
@@ -885,14 +942,14 @@ function openCategoriaModal(categoriaId = null) {
     document.getElementById('categoriaImagenesPreview').innerHTML = '';
     document.getElementById('categoriaModalTitle').textContent = 'Agregar Categoría';
     if (categoriaId) loadCategoriaData(categoriaId);
-    modal.classList.add('active');
+    showAdminDialog(modal, 'categoriaTitulo');
 }
 
 function closeCategoriaModal() {
     if (categorySaveInProgress) return;
     categoryEditorVersion++;
     categoryReady = false;
-    document.getElementById('categoriaModal').classList.remove('active');
+    hideAdminDialog(document.getElementById('categoriaModal'));
 }
 
 async function loadCategoriaData(id, version = categoryEditorVersion) {

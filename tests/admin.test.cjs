@@ -382,3 +382,134 @@ test('saving without a replacement technical sheet preserves its existing refere
  assert.equal(uploads.length,0);assert.equal(calls.find(req=>req.table==='productos'&&req.action==='update').payload.ficha_tecnica,'https://example.test/existing.pdf');
  }finally{dom.window.close()}
 });
+
+for (const kind of ['Producto','Categoria']) {
+ const prefix=kind.toLowerCase();
+ test(`${prefix} editor opens as a named dialog and hides on close`,async()=>{
+  const {dom,w,d}=await admin();try{
+   const modal=d.getElementById(`${prefix}Modal`);
+   assert.equal(modal.hidden,true);
+   assert.equal(modal.getAttribute('aria-hidden'),'true');
+   assert.ok(modal.hasAttribute('inert'));
+   w[`open${kind}Modal`]();
+   assert.equal(modal.getAttribute('role'),'dialog');
+   assert.equal(modal.getAttribute('aria-modal'),'true');
+   assert.ok(d.getElementById(modal.getAttribute('aria-labelledby')).textContent.trim());
+   assert.ok(modal.querySelector('.modal-close').getAttribute('aria-label'));
+   assert.equal(modal.hidden,false);
+   assert.equal(modal.getAttribute('aria-hidden'),'false');
+   assert.equal(modal.hasAttribute('inert'),false);
+   assert.equal(d.activeElement,d.getElementById(`${prefix}Titulo`));
+   w[`close${kind}Modal`]();
+   assert.equal(modal.hidden,true);
+   assert.equal(modal.getAttribute('aria-hidden'),'true');
+   assert.ok(modal.hasAttribute('inert'));
+   assert.equal(modal.classList.contains('active'),false);
+  }finally{dom.window.close()}
+ });
+ test(`${prefix} dialog restores its original trigger after repeated opening`,async()=>{
+  const {dom,w,d}=await admin();try{
+   d.getElementById('adminDashboard').style.display='grid';
+   const trigger=d.getElementById('addNewBtn');trigger.focus();
+   w[`open${kind}Modal`]();
+   d.getElementById(`${prefix}Descripcion`).focus();
+   w[`open${kind}Modal`]();
+   w[`close${kind}Modal`]();
+   assert.equal(d.activeElement,trigger);
+   const another=d.getElementById('mobileMenuBtn');another.focus();
+   w[`close${kind}Modal`]();
+   assert.equal(d.activeElement,another,'closing an already hidden dialog must not steal focus');
+  }finally{dom.window.close()}
+ });
+ test(`${prefix} dialog restores focus to the add button if its trigger disappeared`,async()=>{
+  const {dom,w,d}=await admin();try{
+   d.getElementById('adminDashboard').style.display='grid';
+   const trigger=d.createElement('button');d.body.append(trigger);trigger.focus();
+   w[`open${kind}Modal`]();trigger.remove();w[`close${kind}Modal`]();
+   assert.equal(d.activeElement,d.getElementById('addNewBtn'));
+  }finally{dom.window.close()}
+ });
+}
+
+function pressAdminKey(w,target,key,options={}) {
+ const event=new w.KeyboardEvent('keydown',{key,bubbles:true,cancelable:true,...options});
+ target.dispatchEvent(event);
+ return event;
+}
+for (const kind of ['Producto','Categoria']) {
+ const prefix=kind.toLowerCase();
+ test(`${prefix} dialog traps Tab at both boundaries but keeps normal field navigation`,async()=>{
+  const {dom,w,d}=await admin();try{
+   w[`open${kind}Modal`]();
+   const modal=d.getElementById(`${prefix}Modal`);
+   const first=modal.querySelector('.modal-close');const last=modal.querySelector('[type="submit"]');
+   const hidden=d.createElement('button');hidden.hidden=true;modal.append(hidden);
+   const disabled=d.createElement('button');disabled.disabled=true;modal.append(disabled);
+   const invisible=d.createElement('button');invisible.style.display='none';modal.append(invisible);
+   const inert=d.createElement('div');inert.setAttribute('inert','');inert.append(d.createElement('button'));modal.append(inert);
+   last.focus();assert.equal(pressAdminKey(w,last,'Tab').defaultPrevented,true);assert.equal(d.activeElement,first);
+   assert.equal(pressAdminKey(w,first,'Tab',{shiftKey:true}).defaultPrevented,true);assert.equal(d.activeElement,last);
+   const title=d.getElementById(`${prefix}Titulo`);title.focus();
+   assert.equal(pressAdminKey(w,title,'Tab').defaultPrevented,false,'normal in-dialog navigation is left to the browser');
+  }finally{dom.window.close()}
+ });
+ test(`${prefix} dialog recovers escaped focus and handles no tabbable controls`,async()=>{
+  const {dom,w,d}=await admin();try{
+   w[`open${kind}Modal`]();const modal=d.getElementById(`${prefix}Modal`);
+   const outside=d.getElementById('loginEmail');outside.focus();
+   assert.equal(pressAdminKey(w,outside,'Tab').defaultPrevented,true);
+   assert.equal(d.activeElement,modal.querySelector('.modal-close'));
+   modal.querySelectorAll('button,input,textarea,select,a').forEach(control=>control.tabIndex=-1);
+   assert.equal(pressAdminKey(w,d.activeElement,'Tab').defaultPrevented,true);
+   assert.equal(d.activeElement,modal);
+  }finally{dom.window.close()}
+ });
+ test(`${prefix} Escape dismisses only an open dialog and restores focus`,async()=>{
+  const {dom,w,d}=await admin();try{
+   d.getElementById('adminDashboard').style.display='grid';
+   const trigger=d.getElementById('addNewBtn');trigger.focus();w[`open${kind}Modal`]();
+   assert.equal(pressAdminKey(w,d.activeElement,'Escape').defaultPrevented,true);
+   assert.equal(d.getElementById(`${prefix}Modal`).hidden,true);assert.equal(d.activeElement,trigger);
+   assert.equal(pressAdminKey(w,trigger,'Escape').defaultPrevented,false);
+  }finally{dom.window.close()}
+ });
+ test(`${prefix} pending save blocks Escape, backdrop and direct dismissal without releasing the focus trap`,async()=>{
+  let resolve;const pending=new Promise(r=>resolve=r);
+  const {dom,w,d,calls}=await admin(req=>req.action==='update'?pending:{data:[],error:null});try{
+   d.getElementById('adminDashboard').style.display='grid';
+   const trigger=d.getElementById('addNewBtn');trigger.focus();w[`open${kind}Modal`]();
+   const modal=d.getElementById(`${prefix}Modal`);const form=d.getElementById(`${prefix}Form`);
+   d.getElementById(`${prefix}Id`).value='1';
+   if (kind==='Producto') d.getElementById('productoImagenUrl').value='img/logo.jpeg';
+   else d.getElementById('categoriaImagenesUrls').value='a||b||c||d';
+   form.dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
+   assert.equal(calls.filter(req=>req.action==='update').length,1);
+   assert.equal(pressAdminKey(w,d.activeElement,'Escape').defaultPrevented,true);
+   modal.dispatchEvent(new w.MouseEvent('click',{bubbles:true}));w[`close${kind}Modal`]();
+   assert.equal(modal.hidden,false);assert.equal(modal.getAttribute('aria-hidden'),'false');
+   assert.equal(pressAdminKey(w,d.activeElement,'Tab').defaultPrevented,true);
+   assert.equal(d.activeElement,modal.querySelector('.modal-close'),'inert form controls are skipped while saving');
+   resolve({data:null,error:{code:'42501',message:'write failed'}});await new Promise(r=>setTimeout(r,5));
+   pressAdminKey(w,d.activeElement,'Escape');
+   assert.equal(modal.hidden,true);assert.equal(d.activeElement,trigger);
+  }finally{resolve?.({data:null,error:{code:'42501',message:'write failed'}});await new Promise(r=>setTimeout(r,5));dom.window.close()}
+ });
+}
+
+for (const kind of ['Producto','Categoria']) {
+ const prefix=kind.toLowerCase();
+ test(`${prefix} successful save keeps focus useful when the refreshed table replaces its trigger`,async()=>{
+  const {dom,w,d}=await admin(req=>({data:req.action==='select'?[]:{id:1},error:null}));try{
+   d.getElementById('adminDashboard').style.display='grid';
+   const trigger=d.createElement('button');d.getElementById(`${prefix}sTableBody`).append(trigger);trigger.focus();
+   w[`open${kind}Modal`]();d.getElementById(`${prefix}Id`).value='1';
+   if (kind==='Producto') d.getElementById('productoImagenUrl').value='img/logo.jpeg';
+   else d.getElementById('categoriaImagenesUrls').value='a||b||c||d';
+   d.getElementById(`${prefix}Form`).dispatchEvent(new w.Event('submit',{cancelable:true}));
+   await new Promise(r=>setTimeout(r,10));
+   assert.equal(d.getElementById(`${prefix}Modal`).hidden,true);
+   assert.equal(trigger.isConnected,false);
+   assert.equal(d.activeElement,d.getElementById('addNewBtn'));
+  }finally{dom.window.close()}
+ });
+}

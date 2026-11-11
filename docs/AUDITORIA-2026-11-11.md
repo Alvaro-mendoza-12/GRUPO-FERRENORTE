@@ -77,3 +77,15 @@ Verificación acumulada: 92 pruebas locales aprobadas, sintaxis, build y revisi�
 Pendiente funcional: una cotización restaurada y enviada sin volver a añadir sus artículos conserva los datos de referencia del momento en que se guardó. Revalidar todas las variantes y artículos retirados requiere un flujo explícito; no se eliminan silenciosamente selecciones del cliente. Los importes son referenciales y la consulta no representa un pago ni un pedido confirmado.
 
 Verificación acumulada: 133 pruebas locales aprobadas, sintaxis y build. Fichas permitidas: PDF/DOC/DOCX hasta 10 MiB, firma básica y MIME coherente; DOCX solo verifica contenedor ZIP, no estructura OOXML. Se mantiene pendiente la validación visual/autenticada y el despliegue con destino confirmado.
+
+## Cambio de alcance: colaboración en GitHub
+
+El usuario retiró el objetivo de despliegue Vercel. Los pendientes históricos de conexión/despliegue anteriores ya no son tareas activas: el trabajo actual se entrega mediante ramas, commits y validaciones en GitHub. No se solicitará de nuevo la conexión ni se desplegará sin una nueva instrucción.
+
+`borrador-principal` se creó desde `main` en `4312f45a40cbf681f110d960db7933354bde2544`, sin integrar cambios todavía. El usuario identifica `mejoras` como rama de Óscar, pero la consulta remota actual no la encuentra ni en la tienda ni en el panel separado. No se sustituye esa referencia por `actualizacion`.
+
+## Séptima iteración: accesibilidad del panel
+
+Los editores de productos y categorías ahora incluyen nombre y rol de diálogo, foco inicial y restauración, navegación Tab/Shift+Tab confinada y estados ocultos coherentes. Escape reutiliza el bloqueo de cierre durante un guardado. Tras refrescar la tabla, el foco tiene una alternativa si el botón original desapareció.
+
+Verificación acumulada: 149 pruebas locales aprobadas, sintaxis y build, con 16 regresiones nuevas del panel. Esta verificación DOM no certifica el resultado visual ni el uso con lector de pantalla. La comparación estática con el panel separado y el plan de integración están en `COMPARACION-ADMIN-E-INTEGRACION.md`.
