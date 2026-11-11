@@ -42,6 +42,8 @@ let productWriteUncertain = false;
 let categoryWriteUncertain = false;
 let configWriteUncertain = false;
 let configSaveInProgress = false;
+let configReady = false;
+let configLoadVersion = 0;
 let categoryEditorVersion = 0;
 let categoryReady = false;
 let categorySaveInProgress = false;
@@ -1005,32 +1007,46 @@ window.onclick = function (e) {
 // CONFIGURACIÓN
 // ===========================
 async function loadConfiguracion() {
+    // Do not replace the editor or its identity while a save is pending.
+    if (configSaveInProgress) return;
+    const version = ++configLoadVersion;
+    configReady = false;
     showLoading();
     try {
-        const { data, error } = await supabaseClient.from('configuracion').select('*').single();
+        // Two rows are enough to distinguish an empty table from a singleton
+        // and an ambiguous configuration. A read error is never an empty table.
+        const { data, error } = await supabaseClient.from('configuracion').select('*').limit(2);
+        if (version !== configLoadVersion) return;
         if (error) throw error;
+        if (!Array.isArray(data)) throw new Error('La respuesta de configuración no es válida.');
+        if (data.length > 1) throw new Error('Hay varias configuraciones. Revisa los registros duplicados antes de guardar.');
+        if (data.length === 1 && !data[0]?.id) throw new Error('La configuración no tiene un identificador válido.');
 
-        if (data) {
-            document.getElementById('configId').value = data.id;
-            document.getElementById('configNombre').value = data.nombre_sitio || '';
-            document.getElementById('configDescripcion').value = data.descripcion_sitio || '';
-            document.getElementById('configWhatsapp').value = data.contacto_whatsapp || '';
-            document.getElementById('configLogoUrl').value = data.logo_url || '';
-
-            if (data.logo_url) {
-                document.getElementById('configLogoPreview').innerHTML = `<div class="preview-item"><img src="${escapeAdminHTML(data.logo_url)}" alt="Logo"></div>`;
-            }
-        }
+        const config = data[0] || {};
+        document.getElementById('configForm').reset();
+        document.getElementById('configId').value = config.id || '';
+        document.getElementById('configNombre').value = config.nombre_sitio || '';
+        document.getElementById('configDescripcion').value = config.descripcion_sitio || '';
+        document.getElementById('configWhatsapp').value = config.contacto_whatsapp || '';
+        document.getElementById('configLogoUrl').value = config.logo_url || '';
+        document.getElementById('configLogoPreview').innerHTML = config.logo_url
+            ? `<div class="preview-item"><img src="${escapeAdminHTML(config.logo_url)}" alt="Logo"></div>` : '';
+        // Loading does not reconcile a previously uncertain INSERT. Keep its
+        // guard until a fresh page load and deliberate review of the records.
+        configReady = true;
     } catch (error) {
+        if (version !== configLoadVersion) return;
         console.error('Error loading config:', error);
-        // If empty, it's fine, we'll create one
+        alert('Error al cargar configuración. No se puede guardar. ' + (error.message || 'Revisa la conexión y los permisos.'));
+    } finally {
+        hideLoading();
     }
-    hideLoading();
 }
 
 document.getElementById('configForm').addEventListener('submit', async (e) => {
     e.preventDefault();
     if (configSaveInProgress) return;
+    if (!configReady) { alert('Error: no se cargó la configuración. Vuelve a abrir la sección antes de guardar.'); return; }
     if (configWriteUncertain) { alert('Actualiza la página y comprueba la configuración antes de reintentar un guardado sin confirmar.'); return; }
     configSaveInProgress = true;
     showLoading();

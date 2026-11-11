@@ -38,7 +38,8 @@ function getWhatsAppNumber() {
 function syncBodyScrollLock() {
     const navOpen = document.getElementById('navMenu')?.classList.contains('active');
     const sidebarOpen = document.getElementById('quoteSidebar')?.classList.contains('active');
-    document.body.classList.toggle('menu-open', Boolean(navOpen || sidebarOpen));
+    const productOpen = document.getElementById('productDetailModal')?.classList.contains('active');
+    document.body.classList.toggle('menu-open', Boolean(navOpen || sidebarOpen || productOpen));
     const navBackdrop = document.getElementById('mobileNavBackdrop');
     if (navBackdrop) navBackdrop.classList.toggle('active', Boolean(navOpen));
 }
@@ -54,6 +55,9 @@ try {
     console.error("Error parsing cart:", e);
     quoteCart = [];
 }
+let productReturnFocus = null;
+let quoteReturnFocus = null;
+let currentModalProduct = null;
 let variantRequestId = 0;
 let selectedVariant = null; // Variante seleccionada en el modal actual
 
@@ -376,6 +380,12 @@ function verDetalleProducto(id) {
     const producto = productos.find(p => p.id === id);
     document.getElementById('modalQty').value = 1;
     if (!producto) return;
+    const trigger = document.activeElement;
+    closeQuoteSidebar();
+    mobileNavBackdrop?.click();
+    productReturnFocus = trigger;
+    currentModalProduct = producto;
+    document.getElementById('modalProductImage').alt = producto.titulo;
 
     document.getElementById('modalProductImage').src = producto.imagen;
     document.getElementById('modalProductTitle').innerText = producto.titulo;
@@ -427,22 +437,20 @@ function verDetalleProducto(id) {
         specsContainer.style.display = 'none';
     }
 
-    // WhatsApp
-    let waMsg = `Hola, estoy interesado en el producto: *${producto.titulo}*`;
-    if (producto.precio > 0) waMsg += ` (Precio: S/ ${producto.precio})`;
-    const whatsappBtn = document.getElementById('modalWhatsAppBtn');
-    const waNumber = getWhatsAppNumber();
-    whatsappBtn.href = `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}`;
-
-    // Reset Selection
+    // Reset selection before constructing the consultation link.
     selectedVariant = null;
+    updateProductWhatsApp();
     const variantsEl = document.getElementById('modalProductVariants');
     variantsEl.style.display = 'none';
 
     // Cargar Variantes desde Supabase
     cargarYRenderizarVariantes(producto);
 
+    document.getElementById('productDetailModal').removeAttribute('inert');
+    document.getElementById('productDetailModal').setAttribute('aria-hidden', 'false');
     document.getElementById('productDetailModal').classList.add('active');
+    syncBodyScrollLock();
+    document.querySelector('#productDetailModal .modal-close-btn')?.focus();
 
     // Configurar botón "Cotizar" en el modal
     const addToQuoteBtn = document.getElementById('addToQuoteBtn');
@@ -476,6 +484,8 @@ async function cargarYRenderizarVariantes(producto) {
             variants.forEach(v => {
                 const btn = document.createElement('button');
                 btn.className = 'variant-opt-btn';
+                btn.type = 'button';
+                btn.setAttribute('aria-pressed', 'false');
                 btn.innerText = v.titulo;
                 btn.style = 'padding: 8px 16px; border: 2px solid var(--gray-200); border-radius: 8px; background: white; cursor: pointer; font-size: 13px; font-weight: 600; transition: all 0.2s;';
 
@@ -484,6 +494,9 @@ async function cargarYRenderizarVariantes(producto) {
             });
         }
     } catch (e) {
+        if (requestId !== variantRequestId) return;
+        wrapper.style.display = 'block';
+        container.textContent = 'No se pudieron cargar las opciones. Consulta las opciones disponibles con un asesor.';
         console.error('Error cargando variantes:', e);
     }
 }
@@ -491,6 +504,7 @@ async function cargarYRenderizarVariantes(producto) {
 function seleccionarVariante(variante, btn, productoBase) {
     // Deseleccionar otros
     document.querySelectorAll('.variant-opt-btn').forEach(b => {
+        b.setAttribute('aria-pressed', 'false');
         b.style.borderColor = 'var(--gray-200)';
         b.style.color = 'var(--gray-700)';
     });
@@ -499,6 +513,12 @@ function seleccionarVariante(variante, btn, productoBase) {
     btn.style.borderColor = 'var(--primary-blue)';
     btn.style.color = 'var(--primary-blue)';
     selectedVariant = variante;
+    btn.setAttribute('aria-pressed', 'true');
+    const stockEl = document.getElementById('modalProductStock');
+    stockEl.textContent = variante.stock > 0 ? `${variante.stock} EN STOCK` : 'CONSULTAR DISPONIBILIDAD';
+    stockEl.className = variante.stock > 0 ? 'badge badge-success' : 'badge badge-info';
+    document.getElementById('modalProductImage').alt = `${productoBase.titulo} - ${variante.titulo}`;
+    updateProductWhatsApp();
 
     // Actualizar Imagen si existe
     if (variante.imagen_url) {
@@ -524,12 +544,31 @@ function changeModalQty(val) {
     current += val;
     if (current < 1) current = 1;
     input.value = Math.min(999, current);
+    updateProductWhatsApp();
+}
+
+function updateProductWhatsApp() {
+    if (!currentModalProduct) return;
+    const quantity = Math.max(1, Math.min(999, Number(document.getElementById('modalQty').value) || 1));
+    const price = selectedVariant?.precio > 0 ? selectedVariant.precio : currentModalProduct.precio;
+    let message = `Hola, estoy interesado en el producto: *${currentModalProduct.titulo}*`;
+    if (selectedVariant) message += `\nOpción: ${selectedVariant.titulo}`;
+    message += `\nCantidad: ${quantity}`;
+    if (price > 0) message += `\nPrecio de referencia: S/ ${Number(price).toFixed(2)}`;
+    document.getElementById('modalWhatsAppBtn').href = `https://wa.me/${getWhatsAppNumber()}?text=${encodeURIComponent(message)}`;
 }
 
 function cerrarModalProducto() {
+    const modal = document.getElementById('productDetailModal');
+    if (!modal.classList.contains('active')) return;
     variantRequestId++;
+    modal.classList.remove('active');
+    currentModalProduct = null;
     syncBodyScrollLock();
-    document.getElementById('productDetailModal').classList.remove('active');
+    const trigger = productReturnFocus?.isConnected && productReturnFocus.tabIndex >= 0 ? productReturnFocus : document.getElementById('cartToggleBtn');
+    trigger?.focus();
+    modal.setAttribute('inert', '');
+    modal.setAttribute('aria-hidden', 'true');
 }
 
 // Cerrar modal al hacer click fuera
@@ -659,6 +698,10 @@ function renderQuoteItems() {
 }
 
 function openQuoteSidebar() {
+    const trigger = document.activeElement;
+    cerrarModalProducto();
+    mobileNavBackdrop?.click();
+    quoteReturnFocus = trigger;
     // Cerrar buscadores abiertos
     document.querySelectorAll('.search-results-dropdown').forEach(d => d.classList.remove('active'));
 
@@ -666,16 +709,20 @@ function openQuoteSidebar() {
     const backdrop = document.getElementById('sidebarBackdrop');
 
     if (!sidebar) return;
+    sidebar.removeAttribute('inert');
+    sidebar.setAttribute('aria-hidden', 'false');
     sidebar.classList.add('active');
     if (backdrop) backdrop.classList.add('active');
     syncBodyScrollLock();
 
     renderQuoteItems();
+    document.getElementById('closeQuoteSidebar')?.focus();
 }
 
 function closeQuoteSidebar() {
     const sidebar = document.getElementById('quoteSidebar');
     const backdrop = document.getElementById('sidebarBackdrop');
+    if (!sidebar?.classList.contains('active')) return;
 
     if (sidebar) {
         sidebar.classList.remove('active');
@@ -684,6 +731,11 @@ function closeQuoteSidebar() {
         backdrop.classList.remove('active');
     }
     syncBodyScrollLock();
+    const hiddenProduct = quoteReturnFocus?.closest('#productDetailModal') && !document.getElementById('productDetailModal').classList.contains('active');
+    const trigger = quoteReturnFocus?.isConnected && quoteReturnFocus.tabIndex >= 0 && !hiddenProduct ? quoteReturnFocus : document.getElementById('cartToggleBtn');
+    trigger?.focus();
+    sidebar.setAttribute('inert', '');
+    sidebar.setAttribute('aria-hidden', 'true');
 }
 
 // Búsqueda de productos
@@ -1306,4 +1358,27 @@ document.addEventListener('keydown', event => {
     cerrarModalProducto();
     closeQuoteSidebar();
     mobileNavBackdrop?.click();
+});
+
+// Keep keyboard focus within the active dialog, including Shift+Tab wrapping.
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Tab') return;
+    const overlay = document.querySelector('#quoteSidebar.active') || document.querySelector('#productDetailModal.active');
+    if (!overlay) return;
+    const candidates = [...overlay.querySelectorAll('button, a[href], input, select, textarea, [tabindex]')].filter(element => {
+        if (element.disabled || element.tabIndex < 0) return false;
+        for (let parent = element; parent && parent !== overlay; parent = parent.parentElement) {
+            const style = getComputedStyle(parent);
+            if (parent.hidden || style.display === 'none' || style.visibility === 'hidden') return false;
+        }
+        return true;
+    });
+    const first = candidates[0];
+    const last = candidates[candidates.length - 1];
+    if (!first) return;
+    if (!overlay.contains(document.activeElement) || (!event.shiftKey && document.activeElement === last)) {
+        event.preventDefault(); first.focus();
+    } else if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault(); last.focus();
+    }
 });

@@ -38,6 +38,6 @@ test('technical sheets reject executable URLs',()=>{
  assert.equal(c.safeDocumentURL('https://example.com/sheet.pdf'), 'https://example.com/sheet.pdf');
 });
 test('modal quantity increment stops at the same limit as the cart',()=>{
- const input={value:'999'};const c=load(['changeModalQty'],{document:{getElementById(){return input;}}});
+ const input={value:'999'};const c=load(['changeModalQty'],{updateProductWhatsApp(){},document:{getElementById(){return input;}}});
  c.changeModalQty(1);assert.equal(Number(input.value),999);
 });

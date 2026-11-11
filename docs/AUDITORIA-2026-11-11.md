@@ -50,3 +50,12 @@ Verificación local acumulada: 29 pruebas DOM/unitarias, sintaxis y build. Todas
 Verificación acumulada: 37 pruebas aprobadas, comprobación sintáctica y build. La suite usa Supabase simulado; no certifica transacciones ni permisos en producción. No se añadieron migraciones ni se cambiaron políticas reales.
 
 QA visual adicional: el servidor anunció escucha en 8766, pero tanto una comprobación HTTP independiente como el navegador recibieron conexión rechazada. El acceso al servidor entre superficies sigue pendiente; no se han aprobado capturas de escritorio o móvil. Para un preview Vercel falta conectar la cuenta e identificar proyecto y equipo.
+
+## Cuarta iteración: configuración y accesibilidad
+- La configuración solo se puede guardar después de confirmar una colección vacía o una única fila válida. Errores de lectura, datos inválidos o varias filas bloquean el guardado, sin interpretarlos como una configuración nueva.
+- Las recargas de configuración no sustituyen el editor durante un guardado ni eliminan la protección de inserciones inciertas.
+- Los diálogos de producto/cotización capturan y devuelven el foco, mantienen Tab/Shift+Tab dentro del diálogo y bloquean el desplazamiento del fondo. Solo uno queda abierto; cerrados usan `inert` y `aria-hidden`, con visibilidad CSS del panel de cotización comprobada.
+- La consulta directa por WhatsApp incorpora opción seleccionada, cantidad y precio de referencia. La disponibilidad visible corresponde a la variante, no al producto base.
+- Los errores al cargar opciones son visibles; respuestas antiguas no reemplazan las opciones del producto actual.
+
+Verificación acumulada: 55 pruebas, sintaxis y build. Incluye una prueba DOM con CSS real para la visibilidad del panel cerrado. Esto no sustituye QA visual en navegador ni pruebas de Supabase real; esos pendientes se mantienen.

@@ -12,7 +12,7 @@ async function app(overrides={}){
  const w=dom.window;
  w.console={log(){},error(){},warn(){}};w.scrollTo=()=>{};w.HTMLElement.prototype.scrollIntoView=()=>{};
  w.IntersectionObserver=class {observe(){} unobserve(){}};
- w.supabaseClient={from(table){const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(resolve){return Promise.resolve({data:(table in overrides?overrides:fixture)[table],error:null}).then(resolve)}};return q}};
+ w.supabaseClient={from(table){const q={select(){return q},eq(){return q},order(){return q},single(){return q},then(resolve){const value=(table in overrides?overrides:fixture)[table];return Promise.resolve(typeof value==='function'?value():{data:value,error:null}).then(resolve)}};return q}};
  w.eval(fs.readFileSync('script.js','utf8'));
  await new Promise(r=>setTimeout(r,15));
  return {dom,w,d:w.document};
@@ -57,5 +57,52 @@ test('search button closes mobile navigation and releases body scroll',async()=>
  d.querySelector('.mobile-search .searchBtn').click();
  assert.equal(d.querySelector('#navMenu').classList.contains('active'),false);
  assert.equal(d.body.classList.contains('menu-open'),false);
+ }finally{dom.window.close()}
+});
+test('product dialog locks scroll, traps keyboard focus and restores its trigger',async()=>{
+ const {dom,w,d}=await app();try{
+ const trigger=d.querySelector('#productsGrid button');trigger.focus();w.verDetalleProducto(1);
+ const close=d.querySelector('#productDetailModal .modal-close-btn');assert.equal(d.activeElement,close);assert.equal(d.body.classList.contains('menu-open'),true);
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',shiftKey:true,bubbles:true,cancelable:true}));assert.equal(d.activeElement,d.querySelector('#modalWhatsAppBtn'));
+ d.dispatchEvent(new w.KeyboardEvent('keydown',{key:'Tab',bubbles:true,cancelable:true}));assert.equal(d.activeElement,close);
+ w.cerrarModalProducto();assert.equal(d.activeElement,trigger);assert.equal(d.body.classList.contains('menu-open'),false);
+ }finally{dom.window.close()}
+});
+test('moving from product to quote leaves only one dialog open and keeps focus inside',async()=>{
+ const {dom,w,d}=await app();try{
+ w.verDetalleProducto(1);d.querySelector('#addToQuoteBtn').click();
+ assert.equal(d.querySelector('#productDetailModal').classList.contains('active'),false);assert.equal(d.querySelector('#quoteSidebar').classList.contains('active'),true);assert.equal(d.activeElement,d.querySelector('#closeQuoteSidebar'));
+ w.closeQuoteSidebar();assert.equal(d.activeElement,d.querySelector('#cartToggleBtn'));
+ }finally{dom.window.close()}
+});
+test('direct WhatsApp consultation includes selected option and quantity',async()=>{
+ const variant={id:9,titulo:'Azul',precio:150,stock:0};
+ const {dom,w,d}=await app({variantes:[variant]});try{
+ w.verDetalleProducto(1);await new Promise(r=>setTimeout(r,5));d.querySelector('.variant-opt-btn').click();w.changeModalQty(2);
+ const message=new URL(d.querySelector('#modalWhatsAppBtn').href).searchParams.get('text');assert.match(message,/Azul/);assert.match(message,/Cantidad: 3/);assert.match(message,/150/);
+ assert.match(d.querySelector('#modalProductStock').textContent,/CONSULTAR/);assert.equal(d.querySelector('.variant-opt-btn').getAttribute('aria-pressed'),'true');
+ }finally{dom.window.close()}
+});
+test('closing a dialog opened from a non-focusable card returns focus to a visible control',async()=>{
+ const {dom,w,d}=await app();try{w.verDetalleProducto(1);w.cerrarModalProducto();assert.equal(d.activeElement,d.querySelector('#cartToggleBtn'))}finally{dom.window.close()}
+});
+test('failed option loading is visible instead of silently looking like no options',async()=>{
+ const {dom,w,d}=await app({variantes:()=>({data:null,error:{message:'offline'}})});try{
+ w.verDetalleProducto(1);await new Promise(r=>setTimeout(r,5));assert.equal(d.querySelector('#modalProductVariants').style.display,'block');assert.match(d.querySelector('#variantsSelectorContainer').textContent,/No se pudieron cargar/);
+ }finally{dom.window.close()}
+});
+test('late options from a previous product cannot replace the current product options',async()=>{
+ const resolves=[];const {dom,w,d}=await app({variantes:()=>new Promise(resolve=>resolves.push(resolve))});try{
+ w.verDetalleProducto(1);w.verDetalleProducto(2);await new Promise(r=>setTimeout(r,5));
+ resolves[1]({data:[{id:22,titulo:'Current'}],error:null});await new Promise(r=>setTimeout(r,5));resolves[0]({data:[{id:11,titulo:'Old'}],error:null});await new Promise(r=>setTimeout(r,5));
+ assert.equal(d.querySelectorAll('.variant-opt-btn').length,1);assert.equal(d.querySelector('.variant-opt-btn').innerText,'Current');
+ }finally{dom.window.close()}
+});
+test('closed quote panel is hidden from keyboard and accessibility, with real styles',async()=>{
+ const {dom,w,d}=await app();try{
+ const style=d.createElement('style');style.textContent=fs.readFileSync('styles.css','utf8');d.head.append(style);
+ const panel=d.querySelector('#quoteSidebar');assert.equal(w.getComputedStyle(panel).visibility,'hidden');assert.equal(panel.hasAttribute('inert'),true);assert.equal(panel.getAttribute('aria-hidden'),'true');
+ w.openQuoteSidebar();assert.equal(w.getComputedStyle(panel).visibility,'visible');assert.equal(panel.hasAttribute('inert'),false);assert.equal(panel.getAttribute('aria-hidden'),'false');
+ w.closeQuoteSidebar();assert.equal(panel.hasAttribute('inert'),true);assert.equal(panel.getAttribute('aria-hidden'),'true');
  }finally{dom.window.close()}
 });

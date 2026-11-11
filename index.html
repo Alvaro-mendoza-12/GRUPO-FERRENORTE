@@ -467,9 +467,9 @@
     </a>
 
     <!-- Product Detail Modal -->
-    <div id="productDetailModal" role="dialog" aria-modal="true" aria-labelledby="modalProductTitle" class="product-modal-overlay">
+    <div id="productDetailModal" inert aria-hidden="true" role="dialog" aria-modal="true" aria-labelledby="modalProductTitle" class="product-modal-overlay">
         <div class="product-modal-content">
-            <button class="modal-close-btn" onclick="cerrarModalProducto()">&times;</button>
+            <button class="modal-close-btn" aria-label="Cerrar detalle del producto" onclick="cerrarModalProducto()">&times;</button>
             <div class="product-detail-grid">
                 <div class="product-detail-image-container">
                     <img id="modalProductImage" src="" alt="" class="product-detail-img">
@@ -508,7 +508,7 @@
                     <div id="modalProductSpecsContainer" class="modal-specs-container" style="display: none;">
                         <h4 class="modal-specs-title">
                             Documentación Adicional:</h4>
-                        <a id="modalProductSpecsLink" href="#" target="_blank" class="btn-specs-download">
+                        <a id="modalProductSpecsLink" rel="noopener noreferrer" href="#" target="_blank" class="btn-specs-download">
                             <i class="fas fa-file-pdf"></i> Descargar Ficha Técnica
                         </a>
                     </div>
@@ -517,7 +517,7 @@
                         <button id="addToQuoteBtn" class="btn btn-primary modal-add-quote-btn">
                             <i class="fas fa-plus-circle"></i> AÑADIR A MI LISTA
                         </button>
-                        <a href="#" id="modalWhatsAppBtn" class="whatsapp-btn-large modal-whatsapp-btn" target="_blank">
+                        <a href="#" id="modalWhatsAppBtn" rel="noopener noreferrer" class="whatsapp-btn-large modal-whatsapp-btn" target="_blank">
                             <i class="fab fa-whatsapp"></i> Chat Directo con un Asesor
                         </a>
                     </div>
@@ -528,10 +528,10 @@
 
 
     <!-- Side Quote Panel Móvil/Escritorio Final -->
-    <div id="quoteSidebar" class="quote-sidebar">
+    <div id="quoteSidebar" inert aria-hidden="true" class="quote-sidebar" role="dialog" aria-modal="true" aria-labelledby="quoteTitle">
         <div class="quote-sidebar-header">
-            <h3>Mi Cotización</h3>
-            <button id="closeQuoteSidebar" class="close-btn"><i class="fas fa-times"></i></button>
+            <h3 id="quoteTitle">Mi Cotización</h3>
+            <button id="closeQuoteSidebar" class="close-btn" aria-label="Cerrar cotización"><i class="fas fa-times"></i></button>
         </div>
         <div id="quoteItemsList" class="quote-items-list">
             <div class="empty-cart-msg">

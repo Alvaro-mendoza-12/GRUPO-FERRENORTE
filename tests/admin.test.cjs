@@ -8,7 +8,7 @@ async function admin(handler=()=>({data:[],error:null})){
  w.console={log(){},error(){},warn(){}};w.alert=message=>alerts.push(message);w.confirm=()=>true;
  w.supabaseClient={auth:{getSession:async()=>({data:{session:null},error:null}),signOut:async()=>({error:null})},from(table){
  const request={table,action:'select',filters:[]};
- const q={select(){return q},eq(key,value){request.filters.push([key,value]);return q},order(){return q},single(){return q},delete(){request.action='delete';return q},insert(payload){request.action='insert';request.payload=payload;return q},update(payload){request.action='update';request.payload=payload;return q},then(resolve,reject){calls.push({...request});return Promise.resolve(handler(request)).then(resolve,reject)}};return q;
+ const q={select(){return q},eq(key,value){request.filters.push([key,value]);return q},order(){return q},limit(value){request.limit=value;return q},single(){return q},delete(){request.action='delete';return q},insert(payload){request.action='insert';request.payload=payload;return q},update(payload){request.action='update';request.payload=payload;return q},then(resolve,reject){calls.push({...request});return Promise.resolve(handler(request)).then(resolve,reject)}};return q;
  }};
  w.eval(fs.readFileSync('admin-script.js','utf8'));
  await new Promise(r=>setTimeout(r,5));
@@ -41,7 +41,8 @@ test('failed category deletion never reports success',async()=>{
  }finally{dom.window.close()}
 });
 test('failed configuration save never reports success',async()=>{
- const {dom,w,d,alerts}=await admin(()=>({data:null,error:{message:'permission denied'}}));try{
+ const {dom,w,d,alerts}=await admin(req=>req.action==='select'?{data:[],error:null}:{data:null,error:{code:'42501',message:'permission denied'}});try{
+ await w.loadConfiguracion();
  d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));assert.equal(alerts.includes('Configuración guardada correctamente.'),false);assert.ok(alerts.some(x=>x.includes('Error')));
  }finally{dom.window.close()}
 });
@@ -161,7 +162,8 @@ test('insert confirmation distinguishes server rejection from uncertain response
  }finally{dom.window.close()}
 });
 test('confirmed configuration ID is retained so the next save updates it',async()=>{
- const {dom,w,d,calls}=await admin(()=>({data:{id:77},error:null}));try{
+ const {dom,w,d,calls}=await admin(req=>({data:req.action==='select'?[]:{id:77},error:null}));try{
+ await w.loadConfiguracion();
  d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
  assert.equal(d.querySelector('#configId').value,'77');
  d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));await new Promise(r=>setTimeout(r,5));
@@ -175,4 +177,81 @@ test('transport failures with codes remain uncertain, including aborted requests
  await assert.rejects(()=>w.awaitConfirmedInsert(Promise.reject(new w.DOMException('aborted','AbortError'))),error=>error.uncertainWrite===true);
  assert.throws(()=>w.confirmInsertedRecord({data:null,error:reset}),error=>error.uncertainWrite===true);
  }finally{dom.window.close()}
+});
+
+async function submitConfiguration(w,d){
+ d.querySelector('#configForm').dispatchEvent(new w.Event('submit',{cancelable:true}));
+ await new Promise(r=>setTimeout(r,5));
+}
+test('configuration cannot be saved before a confirmed initial load',async()=>{
+ const {dom,w,d,calls,alerts}=await admin();try{
+ await submitConfiguration(w,d);
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ assert.ok(alerts.some(message=>/carg/i.test(message)));
+ }finally{dom.window.close()}
+});
+for (const [label,result] of [
+ ['read error',{data:null,error:{message:'offline'}}],
+ ['multiple rows',{data:[{id:1},{id:2}],error:null}],
+ ['missing collection',{data:null,error:null}],
+ ['missing row ID',{data:[{nombre_sitio:'Invalid'}],error:null}]
+]) test(`configuration ${label} blocks writes and reports the problem`,async()=>{
+ const {dom,w,d,calls,alerts}=await admin(()=>result);try{
+ await w.loadConfiguracion();
+ assert.ok(alerts.length,'loading failure must be visible before submit');
+ await submitConfiguration(w,d);
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ assert.equal(d.querySelector('#loadingOverlay').style.display,'none');
+ }finally{dom.window.close()}
+});
+test('one loaded configuration is updated, never inserted',async()=>{
+ const {dom,w,d,calls}=await admin(req=>({data:req.action==='select'?[{id:12,nombre_sitio:'Existing'}]:null,error:null}));try{
+ await w.loadConfiguracion();assert.equal(d.querySelector('#configNombre').value,'Existing');
+ await submitConfiguration(w,d);
+ const writes=calls.filter(req=>req.action!=='select');
+ assert.equal(writes.length,1);assert.equal(writes[0].action,'update');
+ assert.deepEqual(writes[0].filters,[['id','12']]);
+ }finally{dom.window.close()}
+});
+test('a confirmed empty configuration clears stale fields and permits insertion',async()=>{
+ const {dom,w,d,calls}=await admin(req=>({data:req.action==='select'?[]:{id:13},error:null}));try{
+ d.querySelector('#configId').value='old';d.querySelector('#configNombre').value='Old';
+ d.querySelector('#configLogoPreview').innerHTML='<img src="old">';
+ await w.loadConfiguracion();
+ assert.equal(d.querySelector('#configId').value,'');assert.equal(d.querySelector('#configNombre').value,'');
+ assert.equal(d.querySelector('#configLogoPreview').children.length,0);
+ await submitConfiguration(w,d);assert.equal(calls.filter(req=>req.action==='insert').length,1);
+ }finally{dom.window.close()}
+});
+test('only the latest configuration load can unlock saving or replace fields',async()=>{
+ let resolve;let count=0;const pending=new Promise(r=>resolve=r);
+ const {dom,w,d,calls}=await admin(req=>req.action==='select'?(++count===1?pending:{data:[{id:22,nombre_sitio:'Latest'}],error:null}):{data:null,error:null});try{
+ const first=w.loadConfiguracion();await Promise.resolve();
+ await submitConfiguration(w,d);assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ await w.loadConfiguracion();resolve({data:[{id:11,nombre_sitio:'Stale'}],error:null});await first;
+ assert.equal(d.querySelector('#configId').value,'22');assert.equal(d.querySelector('#configNombre').value,'Latest');
+ assert.equal(d.querySelector('#loadingOverlay').style.display,'none');
+ }finally{resolve?.({data:[],error:null});dom.window.close()}
+});
+test('failed reload invalidates previously valid configuration for saving',async()=>{
+ let fail=false;const {dom,w,d,calls}=await admin(()=>fail?{data:null,error:{message:'offline'}}:{data:[{id:21}],error:null});try{
+ await w.loadConfiguracion();fail=true;await w.loadConfiguracion();await submitConfiguration(w,d);
+ assert.equal(calls.filter(req=>req.action!=='select').length,0);
+ }finally{dom.window.close()}
+});
+test('reload cannot clear the uncertain configuration insert guard',async()=>{
+ const {dom,w,d,calls}=await admin(req=>req.action==='select'?{data:[],error:null}:{data:null,error:{message:'Failed to fetch'}});try{
+ await w.loadConfiguracion();await submitConfiguration(w,d);await w.loadConfiguracion();await submitConfiguration(w,d);
+ assert.equal(calls.filter(req=>req.action==='insert').length,1);
+ }finally{dom.window.close()}
+});
+test('configuration reloads and repeated submits cannot race an in-flight save',async()=>{
+ let resolve;const pending=new Promise(r=>resolve=r);
+ const {dom,w,d,calls}=await admin(req=>req.action==='select'?{data:[],error:null}:pending);try{
+ await w.loadConfiguracion();await submitConfiguration(w,d);await w.loadConfiguracion();await submitConfiguration(w,d);
+ assert.equal(calls.filter(req=>req.action==='select').length,1);
+ assert.equal(calls.filter(req=>req.action==='insert').length,1);
+ resolve({data:{id:24},error:null});await new Promise(r=>setTimeout(r,5));
+ assert.equal(d.querySelector('#configId').value,'24');
+ }finally{resolve?.({data:{id:24},error:null});dom.window.close()}
 });
