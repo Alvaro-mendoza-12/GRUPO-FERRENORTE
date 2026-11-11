@@ -600,3 +600,13 @@ test('mobile floating shortcuts cannot cover products while contact and quote co
   }
  }finally{dom.window.close()}
 });
+
+test('narrow category cards stack actions without shrinking the quote target',async()=>{
+ const {dom,w,d}=await app();try{
+ w.verDetalleCategoria(1);const style=applyStylesAtWidth(d,320);
+ const footer=d.querySelector('.product-card-footer');
+ assert.equal(w.getComputedStyle(footer).flexDirection,'column');
+ assert.ok(parseFloat(w.getComputedStyle(footer.querySelector('.btn-quote-small')).minHeight)>=44);
+ style.remove();
+ }finally{dom.window.close()}
+});

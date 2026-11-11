@@ -491,3 +491,8 @@ button, input, select, textarea, a { touch-action: manipulation; }
     *, *::before, *::after { animation: none !important; transition: none !important; }
     .product-card, .category-card { opacity: 1 !important; transform: none !important; }
 }
+
+@media (max-width: 360px) {
+    .product-card-footer { flex-direction: column; }
+    .product-card-footer .btn-quote-small { flex-basis: auto; width: 100%; }
+}
