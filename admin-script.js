@@ -1,8 +1,18 @@
+// Database content is text, never executable HTML or inline JavaScript.
+function escapeAdminHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
+}
+
 // ===========================
 // VARIABLES GLOBALES
 // ===========================
+let pendingAdminOperations = 0;
 let currentUser = null;
 let currentSection = 'productos';
+let productEditorVersion = 0;
+let loadedVariantIds = [];
+let variantsReady = false;
+let productSaveInProgress = false;
 let currentCategoryFilter = null; // Para filtrar productos por categoría
 
 // ===========================
@@ -10,22 +20,31 @@ let currentCategoryFilter = null; // Para filtrar productos por categoría
 // ===========================
 
 // Verificar sesión al cargar
-document.addEventListener('DOMContentLoaded', async () => {
+async function initializeAdmin() {
     showLoading();
-
-    const { data: { session } } = await supabaseClient.auth.getSession();
-
-    if (session) {
-        currentUser = session.user;
-        showDashboard();
-        await loadCategoriasSelect(); // Cargar categorías para el selector del modal
-        await loadProductos();
-    } else {
+    try {
+        const { data, error } = await supabaseClient.auth.getSession();
+        if (error) throw error;
+        const session = data?.session;
+        if (session) {
+            currentUser = session.user;
+            showDashboard();
+            await loadCategoriasSelect();
+            await loadProductos();
+        } else {
+            showLogin();
+        }
+    } catch (error) {
+        currentUser = null;
         showLogin();
+        const errorDiv = document.getElementById('loginError');
+        errorDiv.textContent = 'No se pudo comprobar la sesión. Revisa tu conexión e intenta iniciar sesión de nuevo.';
+        errorDiv.style.display = 'block';
+    } finally {
+        hideLoading();
     }
-
-    hideLoading();
-});
+}
+document.addEventListener('DOMContentLoaded', initializeAdmin);
 
 // Login
 document.getElementById('loginForm').addEventListener('submit', async (e) => {
@@ -52,28 +71,37 @@ document.getElementById('loginForm').addEventListener('submit', async (e) => {
 
     } catch (error) {
         console.error('Login error:', error);
-        let msg = error.message;
+        let msg = String(error.message || 'No se pudo iniciar sesión. Inténtalo de nuevo.');
 
         if (msg.includes('Email not confirmed')) {
-            msg = '⚠️ Tu email no ha sido confirmado. Revisa tu correo o desactiva "Confirm Email" en Supabase > Auth > Providers.';
+            msg = '⚠️ Tu email no ha sido confirmado. Revisa el enlace de confirmación de tu correo.';
         } else if (msg.includes('Invalid login credentials')) {
             msg = '❌ Correo o contraseña incorrectos.';
         }
 
-        errorDiv.innerHTML = msg;
+        errorDiv.textContent = msg;
         errorDiv.style.display = 'block';
+    } finally {
         hideLoading();
     }
 });
 
 // Logout
-document.getElementById('logoutBtn').addEventListener('click', async () => {
+async function logoutAdmin() {
     showLoading();
-    await supabaseClient.auth.signOut();
-    currentUser = null;
-    showLogin();
-    hideLoading();
-});
+    try {
+        const { error } = await supabaseClient.auth.signOut();
+        if (error) throw error;
+        currentUser = null;
+        closeMobileSidebar();
+        showLogin();
+    } catch (error) {
+        alert('No se pudo cerrar la sesión. Comprueba tu conexión y vuelve a intentarlo.');
+    } finally {
+        hideLoading();
+    }
+}
+document.getElementById('logoutBtn').addEventListener('click', logoutAdmin);
 
 function showLogin() {
     document.getElementById('loginScreen').style.display = 'flex';
@@ -380,7 +408,7 @@ async function loadCategoriasSelect() {
         const select = document.getElementById('productoCategoria');
         select.innerHTML = '<option value="">Selecciona una categoría...</option>';
         data.forEach(cat => {
-            select.innerHTML += `<option value="${cat.id}">${cat.titulo}</option>`;
+            select.innerHTML += `<option value="${cat.id}">${escapeAdminHTML(cat.titulo)}</option>`;
         });
     } catch (error) {
         console.error('Error cargando lista de categorías:', error);
@@ -425,37 +453,43 @@ async function loadProductos(categoriaId = null) {
 function renderProductosTable(productos) {
     const tbody = document.getElementById('productosTableBody');
 
-    if (productos.length === 0) {
+    if (!productos?.length) {
         tbody.innerHTML = '<tr><td colspan="9" style="text-align: center; padding: 40px; color: var(--gray-600);">No hay productos registrados (en esta vista)</td></tr>';
         return;
     }
 
     tbody.innerHTML = productos.map(p => `
         <tr>
-            <td><img src="${p.imagen_url}" alt="${p.titulo}" class="table-image"></td>
-            <td><strong>${p.titulo}</strong></td>
+            <td><img src="${escapeAdminHTML(p.imagen_url)}" alt="${escapeAdminHTML(p.titulo)}" class="table-image"></td>
+            <td><strong>${escapeAdminHTML(p.titulo)}</strong></td>
             <td>S/ ${p.precio ? parseFloat(p.precio).toFixed(2) : '0.00'}</td>
-            <td>${p.stock || 0}</td>
-            <td>${p.descripcion.substring(0, 50)}...</td>
-            <td>${p.badge ? `<span class="badge badge-info">${p.badge}</span>` : '-'}</td>
-            <td>${p.orden}</td>
+            <td>${escapeAdminHTML(p.stock || 0)}</td>
+            <td>${escapeAdminHTML(String(p.descripcion || '').substring(0, 50))}...</td>
+            <td>${p.badge ? `<span class="badge badge-info">${escapeAdminHTML(p.badge)}</span>` : '-'}</td>
+            <td>${escapeAdminHTML(p.orden)}</td>
             <td>${p.activo ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>'}</td>
             <td>
                 <div class="action-buttons">
-                    <button onclick="editProducto(${p.id})" class="btn btn-secondary btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
-                    <button onclick="deleteProducto(${p.id}, '${p.titulo}')" class="btn btn-danger btn-icon" title="Eliminar"><i class="fas fa-trash"></i></button>
+                    <button data-action="edit-product" class="btn btn-secondary btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button data-action="delete-product" class="btn btn-danger btn-icon" title="Eliminar"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
         </tr>
     `).join('');
+    tbody.querySelectorAll('[data-action=edit-product]').forEach((button, index) => button.addEventListener('click', () => editProducto(productos[index].id)));
+    tbody.querySelectorAll('[data-action=delete-product]').forEach((button, index) => button.addEventListener('click', () => deleteProducto(productos[index].id, productos[index].titulo)));
 }
 
 function openProductoModal(productoId = null) {
+    productEditorVersion++;
+    loadedVariantIds = [];
+    variantsReady = !productoId;
     const modal = document.getElementById('productoModal');
     const form = document.getElementById('productoForm');
 
     form.reset();
     document.getElementById('productoId').value = '';
+    document.getElementById('variantsContainer').replaceChildren();
     document.getElementById('productoImagenUrl').value = '';
     document.getElementById('productoImagenPreview').innerHTML = '';
     document.getElementById('fichaFileStatus').textContent = '';
@@ -475,10 +509,11 @@ function openProductoModal(productoId = null) {
 }
 
 function closeProductoModal() {
+    productEditorVersion++;
     document.getElementById('productoModal').classList.remove('active');
 }
 
-async function loadProductoData(id) {
+async function loadProductoData(id, version = productEditorVersion) {
     showLoading();
     try {
         const { data, error } = await supabaseClient
@@ -488,6 +523,7 @@ async function loadProductoData(id) {
             .single();
 
         if (error) throw error;
+        if (version !== productEditorVersion) return;
 
         document.getElementById('productoId').value = data.id;
         document.getElementById('productoTitulo').value = data.titulo;
@@ -508,34 +544,31 @@ async function loadProductoData(id) {
         if (select && data.categoria_id) select.value = data.categoria_id;
 
         const previewContainer = document.getElementById('productoImagenPreview');
-        previewContainer.innerHTML = `<div class="preview-item"><img src="${data.imagen_url}" alt="${data.titulo}"></div>`;
+        previewContainer.innerHTML = `<div class="preview-item"><img src="${escapeAdminHTML(data.imagen_url)}" alt="${escapeAdminHTML(data.titulo)}"></div>`;
 
         // Cargar variantes
-        await loadProductoVariantes(id);
+        await loadProductoVariantes(id, version);
 
-        document.getElementById('productoModalTitle').textContent = 'Editar Producto';
+        if (version === productEditorVersion) document.getElementById('productoModalTitle').textContent = 'Editar Producto';
     } catch (error) {
         console.error('Error cargando producto:', error);
         alert('Error al cargar producto');
+    } finally {
+        hideLoading();
     }
-    hideLoading();
 }
 
-async function loadProductoVariantes(productoId) {
+async function loadProductoVariantes(productoId, version = productEditorVersion) {
     const container = document.getElementById('variantsContainer');
-    container.innerHTML = '';
-    try {
-        const { data, error } = await supabaseClient
-            .from('variantes')
-            .select('*')
-            .eq('producto_id', productoId)
-            .order('id', { ascending: true });
-
-        if (error) throw error;
-        data.forEach(v => addVariantRow(v));
-    } catch (error) {
-        console.error('Error cargando variantes:', error);
-    }
+    container.replaceChildren();
+    variantsReady = false;
+    const { data, error } = await supabaseClient
+        .from('variantes').select('*').eq('producto_id', productoId).order('id', { ascending: true });
+    if (version !== productEditorVersion) return;
+    if (error) throw error;
+    loadedVariantIds = (data || []).map(variant => String(variant.id));
+    (data || []).forEach(variant => addVariantRow(variant));
+    variantsReady = true;
 }
 
 function addVariantRow(data = {}) {
@@ -543,23 +576,24 @@ function addVariantRow(data = {}) {
     const row = document.createElement('div');
     row.className = 'variant-row';
     row.setAttribute('data-id', data.id || '');
+    row.dataset.active = data.activo === false ? 'false' : 'true';
     row.style = 'display: grid; grid-template-columns: 1fr 90px 140px 40px; gap: 10px; align-items: center; background: white; padding: 12px; border-radius: 10px; border: 1px solid var(--gray-200); box-shadow: 0 2px 4px rgba(0,0,0,0.02);';
 
     const rowId = 'file_' + Math.random().toString(36).substring(7);
 
     row.innerHTML = `
-        <input type="text" class="variant-titulo" placeholder="Ej: Color Azul" value="${data.titulo || ''}" style="width: 100%; border: 1px solid var(--gray-300); padding: 8px; border-radius: 6px; font-size: 13px;">
-        <input type="number" class="variant-precio" step="0.01" placeholder="S/ 0.00" value="${data.precio || ''}" style="width: 100%; border: 1px solid var(--gray-300); padding: 8px; border-radius: 6px; font-size: 13px;">
+        <input type="text" class="variant-titulo" placeholder="Ej: Color Azul" value="${escapeAdminHTML(data.titulo || '')}" style="width: 100%; border: 1px solid var(--gray-300); padding: 8px; border-radius: 6px; font-size: 13px;">
+        <input type="number" class="variant-precio" step="0.01" placeholder="S/ 0.00" value="${escapeAdminHTML(data.precio || '')}" style="width: 100%; border: 1px solid var(--gray-300); padding: 8px; border-radius: 6px; font-size: 13px;">
         
         <div class="variant-upload-box" style="display: flex; align-items: center; gap: 8px;">
             <div class="variant-preview-wrapper" style="width: 35px; height: 35px; border-radius: 6px; overflow: hidden; background: #f1f5f9; border: 1px solid var(--gray-200);">
-                <img class="variant-preview-img" src="${data.imagen_url || 'img/placeholder.png'}" style="width: 100%; height: 100%; object-fit: cover;">
+                <img class="variant-preview-img" src="${escapeAdminHTML(data.imagen_url || 'img/logo.jpeg')}" style="width: 100%; height: 100%; object-fit: cover;">
             </div>
             <input type="file" id="${rowId}" class="variant-file-input" accept="image/*" style="display: none;">
             <button type="button" class="btn-icon" onclick="document.getElementById('${rowId}').click()" style="background: var(--gray-100); border: none; padding: 6px; border-radius: 6px; cursor: pointer; color: var(--gray-600);">
                 <i class="fas fa-camera"></i>
             </button>
-            <input type="hidden" class="variant-img-url" value="${data.imagen_url || ''}">
+            <input type="hidden" class="variant-img-url" value="${escapeAdminHTML(data.imagen_url || '')}">
         </div>
 
         <button type="button" onclick="this.parentElement.remove()" style="background: #fee2e2; color: #ef4444; border: none; padding: 8px; border-radius: 6px; cursor: pointer; transition: all 0.2s;">
@@ -602,12 +636,15 @@ async function deleteProducto(id, titulo) {
 
 document.getElementById('productoForm').addEventListener('submit', async (e) => {
     e.preventDefault();
+    if (productSaveInProgress) return;
+    if (!variantsReady) { alert('No se cargaron las variantes. Vuelve a abrir el producto antes de guardar.'); return; }
     const id = document.getElementById('productoId').value;
     const imagenFile = document.getElementById('productoImagen').files[0];
     let imagenUrl = document.getElementById('productoImagenUrl').value;
 
     if (!imagenFile && !imagenUrl) { alert('Imagen requerida'); return; }
 
+    productSaveInProgress = true;
     showLoading();
     try {
         if (imagenFile) imagenUrl = await uploadImage(imagenFile, 'productos');
@@ -640,6 +677,7 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
         } else {
             const { data: newProd, error: insertError } = await supabaseClient.from('productos').insert([producto]).select().single();
             if (insertError) throw insertError;
+            document.getElementById('productoId').value = newProd.id;
             await saveVariantes(newProd.id);
         }
 
@@ -649,44 +687,54 @@ document.getElementById('productoForm').addEventListener('submit', async (e) => 
         console.error('Error guardando:', error);
         alert('Error: ' + error.message);
     }
+    productSaveInProgress = false;
     hideLoading();
 });
 
 async function saveVariantes(productoId) {
-    const rows = document.querySelectorAll('.variant-row');
-    const variantes = [];
-
+    if (!variantsReady) throw new Error('No se cargaron las variantes. Cierra y vuelve a abrir el producto antes de guardar.');
+    const rows = [...document.querySelectorAll('.variant-row')];
+    const prepared = [];
+    // Complete uploads and validation before any row is written or removed.
     for (const row of rows) {
         const titulo = row.querySelector('.variant-titulo').value.trim();
+        if (!titulo) continue;
         const fileInput = row.querySelector('.variant-file-input');
-        let imgUrl = row.querySelector('.variant-img-url').value;
-
-        if (titulo) {
-            // Si hay un archivo nuevo, subirlo primero
-            if (fileInput.files.length > 0) {
-                try {
-                    imgUrl = await uploadImage(fileInput.files[0], 'variantes');
-                } catch (e) {
-                    console.error('Error subiendo imagen de variante:', e);
-                }
-            }
-
-            variantes.push({
-                producto_id: productoId,
-                titulo: titulo,
-                precio: parseFloat(row.querySelector('.variant-precio').value) || 0,
-                imagen_url: imgUrl,
-                activo: true
-            });
+        let imagen_url = row.querySelector('.variant-img-url').value;
+        if (fileInput.files.length) {
+            imagen_url = await uploadImage(fileInput.files[0], 'variantes');
+            row.querySelector('.variant-img-url').value = imagen_url;
+            fileInput.value = '';
+        }
+        prepared.push({ row, payload: {
+            producto_id: productoId, titulo,
+            precio: parseFloat(row.querySelector('.variant-precio').value) || 0,
+            imagen_url, activo: row.dataset.active !== 'false'
+        }});
+    }
+    const retainedIds = new Set();
+    for (const { row, payload } of prepared) {
+        const id = row.dataset.id;
+        if (id) {
+            const { error } = await supabaseClient.from('variantes').update(payload).eq('id', id).eq('producto_id', productoId);
+            if (error) throw error;
+            retainedIds.add(id);
+        } else {
+            const { data, error } = await supabaseClient.from('variantes').insert([payload]).select('id').single();
+            if (error) throw error;
+            if (!data?.id) throw new Error('No se pudo confirmar la variante guardada.');
+            row.dataset.id = String(data.id);
+            loadedVariantIds.push(String(data.id));
+            retainedIds.add(String(data.id));
         }
     }
-
-    // Limpiar y guardar
-    await supabaseClient.from('variantes').delete().eq('producto_id', productoId);
-    if (variantes.length > 0) {
-        const { error } = await supabaseClient.from('variantes').insert(variantes);
-        if (error) console.error('Error insertando variantes:', error);
+    // Only remove rows loaded in this editor, never concurrently added rows.
+    for (const id of loadedVariantIds) {
+        if (retainedIds.has(id)) continue;
+        const { error } = await supabaseClient.from('variantes').delete().eq('id', id).eq('producto_id', productoId);
+        if (error) throw error;
     }
+    loadedVariantIds = [...retainedIds];
 }
 
 // ===========================
@@ -714,31 +762,34 @@ async function verProductosDeCategoria(id) {
 
 function renderCategoriasTable(categorias) {
     const tbody = document.getElementById('categoriasTableBody');
-    if (categorias.length === 0) {
+    if (!categorias?.length) {
         tbody.innerHTML = '<tr><td colspan="8">No hay categorías</td></tr>';
         return;
     }
 
     tbody.innerHTML = categorias.map(c => `
         <tr>
-            <td><i class="${c.icon}" style="font-size: 24px; color: var(--primary-blue);"></i></td>
-            <td><strong>${c.titulo}</strong></td>
-            <td>${c.descripcion.substring(0, 50)}...</td>
+            <td><i class="${escapeAdminHTML(c.icon)}" style="font-size: 24px; color: var(--primary-blue);"></i></td>
+            <td><strong>${escapeAdminHTML(c.titulo)}</strong></td>
+            <td>${escapeAdminHTML(String(c.descripcion || '').substring(0, 50))}...</td>
             <td>${c.categoria_imagenes?.[0]?.count || 0} imgs</td>
-            <td>${c.badge || '-'}</td>
-            <td>${c.orden}</td>
+            <td>${escapeAdminHTML(c.badge || '-')}</td>
+            <td>${escapeAdminHTML(c.orden)}</td>
             <td>${c.activo ? '<span class="badge badge-success">Activo</span>' : '<span class="badge badge-danger">Inactivo</span>'}</td>
             <td>
                 <div class="action-buttons">
-                    <button onclick="verProductosDeCategoria(${c.id})" class="btn btn-primary btn-icon" title="Ver Productos" style="background-color: var(--primary-orange);">
+                    <button data-action="view-category" class="btn btn-primary btn-icon" title="Ver Productos" style="background-color: var(--primary-orange);">
                         <i class="fas fa-eye"></i> Productos
                     </button>
-                    <button onclick="editCategoria(${c.id})" class="btn btn-secondary btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
-                    <button onclick="deleteCategoria(${c.id}, '${c.titulo}')" class="btn btn-danger btn-icon" title="Eliminar"><i class="fas fa-trash"></i></button>
+                    <button data-action="edit-category" class="btn btn-secondary btn-icon" title="Editar"><i class="fas fa-edit"></i></button>
+                    <button data-action="delete-category" class="btn btn-danger btn-icon" title="Eliminar"><i class="fas fa-trash"></i></button>
                 </div>
             </td>
         </tr>
     `).join('');
+    tbody.querySelectorAll('[data-action=view-category]').forEach((button, index) => button.addEventListener('click', () => verProductosDeCategoria(categorias[index].id)));
+    tbody.querySelectorAll('[data-action=edit-category]').forEach((button, index) => button.addEventListener('click', () => editCategoria(categorias[index].id)));
+    tbody.querySelectorAll('[data-action=delete-category]').forEach((button, index) => button.addEventListener('click', () => deleteCategoria(categorias[index].id, categorias[index].titulo)));
 }
 
 function openCategoriaModal(categoriaId = null) {
@@ -771,7 +822,7 @@ async function loadCategoriaData(id) {
         document.getElementById('categoriaImagenesUrls').value = imgs.map(i => i.imagen_url).join('||');
 
         const preview = document.getElementById('categoriaImagenesPreview');
-        preview.innerHTML = imgs.map(i => `<div class="preview-item"><img src="${i.imagen_url}"></div>`).join('');
+        preview.innerHTML = imgs.map(i => `<div class="preview-item"><img src="${escapeAdminHTML(i.imagen_url)}"></div>`).join('');
 
     } catch (e) { console.error(e); }
     hideLoading();
@@ -783,7 +834,8 @@ async function deleteCategoria(id, title) {
     if (!confirm(`¿Eliminar categoría "${title}"?`)) return;
     showLoading();
     try {
-        await supabaseClient.from('categorias').delete().eq('id', id);
+        const { error } = await supabaseClient.from('categorias').delete().eq('id', id);
+        if (error) throw error;
         alert('Categoría eliminada');
         await loadCategorias();
     } catch (e) { console.error(e); alert('Error al eliminar'); }
@@ -818,15 +870,16 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
 
         let catId = id;
         if (id) {
-            await supabaseClient.from('categorias').update(cat).eq('id', id);
-            await supabaseClient.from('categoria_imagenes').delete().eq('categoria_id', id);
+            const { error } = await supabaseClient.from('categorias').update(cat).eq('id', id);
+            if (error) throw error;
         } else {
-            const { data } = await supabaseClient.from('categorias').insert([cat]).select().single();
+            const { data, error } = await supabaseClient.from('categorias').insert([cat]).select().single();
+            if (error) throw error;
             catId = data.id;
+            document.getElementById('categoriaId').value = catId;
         }
 
-        const imgData = urls.map((url, i) => ({ categoria_id: catId, imagen_url: url, orden: i + 1 }));
-        await supabaseClient.from('categoria_imagenes').insert(imgData);
+        if (!id || files.length > 0) await saveCategoryImages(catId, urls);
 
         closeCategoriaModal();
         alert('Categoría guardada');
@@ -837,9 +890,34 @@ document.getElementById('categoriaForm').addEventListener('submit', async (e) =>
     hideLoading();
 });
 
+// Preserve image rows during replacement; never erase the gallery before writes succeed.
+async function saveCategoryImages(categoryId, urls) {
+    const { data, error } = await supabaseClient.from('categoria_imagenes').select('id').eq('categoria_id', categoryId).order('orden');
+    if (error) throw error;
+    const previous = data || [];
+    for (let index = 0; index < urls.length; index++) {
+        const payload = { categoria_id: categoryId, imagen_url: urls[index], orden: index + 1 };
+        const query = previous[index]
+            ? supabaseClient.from('categoria_imagenes').update(payload).eq('id', previous[index].id).eq('categoria_id', categoryId)
+            : supabaseClient.from('categoria_imagenes').insert([payload]);
+        const { error: writeError } = await query;
+        if (writeError) throw writeError;
+    }
+    for (const image of previous.slice(urls.length)) {
+        const { error: deleteError } = await supabaseClient.from('categoria_imagenes').delete().eq('id', image.id).eq('categoria_id', categoryId);
+        if (deleteError) throw deleteError;
+    }
+}
+
 // Utilities
-function showLoading() { document.getElementById('loadingOverlay').style.display = 'flex'; }
-function hideLoading() { document.getElementById('loadingOverlay').style.display = 'none'; }
+function showLoading() {
+    pendingAdminOperations++;
+    document.getElementById('loadingOverlay').style.display = 'flex';
+}
+function hideLoading() {
+    pendingAdminOperations = Math.max(0, pendingAdminOperations - 1);
+    document.getElementById('loadingOverlay').style.display = pendingAdminOperations ? 'flex' : 'none';
+}
 window.onclick = function (e) {
     if (e.target.id == 'productoModal') closeProductoModal();
     if (e.target.id == 'categoriaModal') closeCategoriaModal();
@@ -862,7 +940,7 @@ async function loadConfiguracion() {
             document.getElementById('configLogoUrl').value = data.logo_url || '';
 
             if (data.logo_url) {
-                document.getElementById('configLogoPreview').innerHTML = `<div class="preview-item"><img src="${data.logo_url}" alt="Logo"></div>`;
+                document.getElementById('configLogoPreview').innerHTML = `<div class="preview-item"><img src="${escapeAdminHTML(data.logo_url)}" alt="Logo"></div>`;
             }
         }
     } catch (error) {
@@ -892,9 +970,11 @@ document.getElementById('configForm').addEventListener('submit', async (e) => {
         };
 
         if (id) {
-            await supabaseClient.from('configuracion').update(config).eq('id', id);
+            const { error } = await supabaseClient.from('configuracion').update(config).eq('id', id);
+            if (error) throw error;
         } else {
-            await supabaseClient.from('configuracion').insert([config]);
+            const { error } = await supabaseClient.from('configuracion').insert([config]);
+            if (error) throw error;
         }
 
         alert('Configuración guardada correctamente.');
