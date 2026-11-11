@@ -1,3 +1,12 @@
+function safeDocumentURL(value) {
+    const url = String(value || '').trim();
+    return /^https:\/\//i.test(url) ? url : '';
+}
+
+function escapeHTML(value) {
+    return String(value ?? '').replace(/[&<>"']/g, char => ({'&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;'}[char]));
+}
+
 // ===========================
 // CARGAR DATOS DESDE SUPABASE
 // ===========================
@@ -39,12 +48,13 @@ try {
     const saved = localStorage.getItem('ferrenorte_quote');
     if (saved) {
         quoteCart = JSON.parse(saved);
-        quoteCart = quoteCart.map(item => ({ ...item, qty: item.qty || 1 }));
+        quoteCart = quoteCart.filter(item => item && /^[0-9]+(?:_[0-9]+)?$/.test(String(item.id))).map(item => ({ ...item, qty: Math.max(1, Math.min(999, Math.floor(Number(item.qty)) || 1)) }));
     }
 } catch (e) {
     console.error("Error parsing cart:", e);
     quoteCart = [];
 }
+let variantRequestId = 0;
 let selectedVariant = null; // Variante seleccionada en el modal actual
 
 const REPRESENTATIVE_PRODUCTS = {
@@ -79,10 +89,10 @@ async function cargarProductos() {
 
         if (error) throw error;
 
-        productos = data.map(p => ({
+        productos = (data || []).map(p => ({
             id: p.id,
-            titulo: p.titulo,
-            descripcion: p.descripcion,
+            titulo: p.titulo || 'Producto',
+            descripcion: p.descripcion || '',
             imagen: p.imagen_url,
             badge: p.badge || '',
             badgeColor: p.badge_color || 'default',
@@ -92,7 +102,7 @@ async function cargarProductos() {
             ficha_tecnica: p.ficha_tecnica || ''
         }));
 
-        incorporarProductosRepresentativos(); // Asegurar que los productos fijos estén presentes
+        // El catálogo publicado proviene de Supabase; no insertar productos ficticios.
         renderProductos();
     } catch (error) {
         console.error('Error cargando productos:', error);
@@ -199,11 +209,11 @@ function renderProductos(filtered = null) {
     grid.innerHTML = dataToShow.map(producto => `
         <div class="product-card" onclick="verDetalleProducto(${producto.id})" style="cursor: pointer;">
             <div class="product-image">
-                <img src="${producto.imagen}" alt="${producto.titulo}" loading="lazy">
-                ${producto.badge ? `<div class="product-badge ${producto.badgeColor === 'new' ? 'new' : ''}">${producto.badge}</div>` : ''}
+                <img src="${escapeHTML(producto.imagen)}" alt="${escapeHTML(producto.titulo)}" loading="lazy">
+                ${producto.badge ? `<div class="product-badge ${producto.badgeColor === 'new' ? 'new' : ''}">${escapeHTML(producto.badge)}</div>` : ''}
             </div>
             <div class="product-content" style="padding: 20px;">
-                <h3 class="product-title" style="font-size: 15px; min-height: 40px; margin-bottom: 12px;">${producto.titulo}</h3>
+                <h3 class="product-title" style="font-size: 15px; min-height: 40px; margin-bottom: 12px;">${escapeHTML(producto.titulo)}</h3>
                 
                 <div class="product-pricing" style="margin-bottom: 15px;">
                     ${producto.precio > 0
@@ -214,7 +224,7 @@ function renderProductos(filtered = null) {
 
                 <div class="product-card-actions" style="display: flex; gap: 8px;">
                     <button class="btn-add-pill" onclick="event.stopPropagation(); verDetalleProducto(${producto.id})" style="flex: 1; padding: 10px; border: 2px solid var(--primary-orange); color: var(--primary-orange); background: transparent; border-radius: 25px; font-weight: 800; font-size: 13px; transition: all 0.3s;">
-                        AGREGAR
+                        Ver producto
                     </button>
                 </div>
             </div>
@@ -233,18 +243,18 @@ function renderCategorias() {
 
     grid.innerHTML = categorias.map((categoria, index) => `
         <div class="category-card ${categoria.inicialmenteActiva ? 'active' : ''}" onclick="verDetalleCategoria(${categoria.id})" style="cursor: pointer;">
-            ${categoria.badge ? `<div class="featured-badge">${categoria.badge}</div>` : ''}
+            ${categoria.badge ? `<div class="featured-badge">${escapeHTML(categoria.badge)}</div>` : ''}
             <div class="category-header">
                 <div class="category-icon">
-                    <i class="${categoria.icon}"></i>
+                    <i class="${escapeHTML(categoria.icon)}"></i>
                 </div>
-                <h3 class="category-title">${categoria.titulo}</h3>
+                <h3 class="category-title">${escapeHTML(categoria.titulo)}</h3>
             </div>
             <div class="category-gallery">
-                ${categoria.imagenes.map(img => `<img src="${img}" alt="Galería ${categoria.titulo}" class="gallery-img" loading="lazy">`).join('')}
+                ${categoria.imagenes.map(img => `<img src="${escapeHTML(img)}" alt="Galería ${escapeHTML(categoria.titulo)}" class="gallery-img" loading="lazy">`).join('')}
             </div>
             <p class="category-description">
-                ${categoria.descripcion}
+                ${escapeHTML(categoria.descripcion)}
             </p>
             <button class="category-btn" onclick="event.stopPropagation(); verDetalleCategoria(${categoria.id})">Ver Productos <i class="fas fa-chevron-right"></i></button>
         </div>
@@ -298,13 +308,13 @@ function verDetalleCategoria(id) {
             grid.innerHTML = productosFiltrados.map(p => `
                 <div class="product-card" onclick="verDetalleProducto(${p.id})" style="cursor: pointer;">
                     <div class="product-image">
-                        <img src="${p.imagen}" alt="${p.titulo}" loading="lazy">
-                        ${p.badge ? `<div class="product-badge ${p.badgeColor === 'new' ? 'new' : ''}">${p.badge}</div>` : ''}
+                        <img src="${escapeHTML(p.imagen)}" alt="${escapeHTML(p.titulo)}" loading="lazy">
+                        ${p.badge ? `<div class="product-badge ${p.badgeColor === 'new' ? 'new' : ''}">${escapeHTML(p.badge)}</div>` : ''}
                     </div>
                     <div class="product-content">
-                        <h3 class="product-title">${p.titulo}</h3>
+                        <h3 class="product-title">${escapeHTML(p.titulo)}</h3>
                         ${p.precio > 0 ? `<div style="font-size: 18px; font-weight: 700; color: var(--primary-blue); margin-bottom: 8px;">S/ ${parseFloat(p.precio).toFixed(2)}</div>` : ''}
-                        <p class="product-description">${p.descripcion}</p>
+                        <p class="product-description">${escapeHTML(p.descripcion)}</p>
                         <div class="product-card-footer" style="display: flex; gap: 10px; margin-top: 15px;">
                             <button class="product-link" onclick="event.stopPropagation(); verDetalleProducto(${p.id})">Detalles</button>
                             <button class="btn-quote-small" onclick="event.stopPropagation(); addToQuote(${p.id})" style="background: var(--gray-100); border: none; padding: 8px 12px; border-radius: 8px; cursor: pointer; color: var(--primary-blue); font-weight: 700;"><i class="fas fa-plus"></i></button>
@@ -364,6 +374,7 @@ function seleccionarCategoria(elemento) {
 // ===========================
 function verDetalleProducto(id) {
     const producto = productos.find(p => p.id === id);
+    document.getElementById('modalQty').value = 1;
     if (!producto) return;
 
     document.getElementById('modalProductImage').src = producto.imagen;
@@ -385,6 +396,7 @@ function verDetalleProducto(id) {
 
     // Price & Stock
     const priceEl = document.getElementById('modalProductPrice');
+    priceEl.style.fontSize = '';
     if (producto.precio && producto.precio > 0) {
         priceEl.textContent = `S/ ${parseFloat(producto.precio).toFixed(2)}`;
         priceEl.style.display = 'block';
@@ -400,7 +412,7 @@ function verDetalleProducto(id) {
         stockEl.className = 'badge badge-success';
         stockEl.style.display = 'inline-block';
     } else {
-        stockEl.textContent = 'COMPRA SEGURA';
+        stockEl.textContent = 'CONSULTAR DISPONIBILIDAD';
         stockEl.className = 'badge badge-info';
         stockEl.style.display = 'inline-block';
     }
@@ -408,8 +420,8 @@ function verDetalleProducto(id) {
     // Ficha Técnica
     const specsContainer = document.getElementById('modalProductSpecsContainer');
     const specsLink = document.getElementById('modalProductSpecsLink');
-    if (producto.ficha_tecnica && producto.ficha_tecnica.trim() !== '') {
-        specsLink.href = producto.ficha_tecnica;
+    if (safeDocumentURL(producto.ficha_tecnica)) {
+        specsLink.href = safeDocumentURL(producto.ficha_tecnica);
         specsContainer.style.display = 'block';
     } else {
         specsContainer.style.display = 'none';
@@ -447,6 +459,7 @@ async function cargarYRenderizarVariantes(producto) {
     const container = document.getElementById('variantsSelectorContainer');
     const wrapper = document.getElementById('modalProductVariants');
     container.innerHTML = '';
+    const requestId = ++variantRequestId;
 
     try {
         const { data: variants, error } = await supabaseClient
@@ -457,6 +470,7 @@ async function cargarYRenderizarVariantes(producto) {
 
         if (error) throw error;
 
+        if (requestId !== variantRequestId) return;
         if (variants && variants.length > 0) {
             wrapper.style.display = 'block';
             variants.forEach(v => {
@@ -509,10 +523,12 @@ function changeModalQty(val) {
     let current = parseInt(input.value) || 1;
     current += val;
     if (current < 1) current = 1;
-    input.value = current;
+    input.value = Math.min(999, current);
 }
 
 function cerrarModalProducto() {
+    variantRequestId++;
+    syncBodyScrollLock();
     document.getElementById('productDetailModal').classList.remove('active');
 }
 
@@ -537,6 +553,7 @@ window.onclick = function (event) {
 // ===========================
 
 function addToQuote(id, qty = 1, variant = null) {
+    qty = Math.max(1, Math.min(999, Math.floor(Number(qty)) || 1));
     const producto = productos.find(p => p.id == id);
     if (!producto) return;
 
@@ -545,7 +562,7 @@ function addToQuote(id, qty = 1, variant = null) {
 
     const existing = quoteCart.find(item => item.id == cartItemId);
     if (existing) {
-        existing.qty += qty;
+        existing.qty = Math.min(999, existing.qty + qty);
     } else {
         quoteCart.push({
             id: cartItemId,
@@ -567,13 +584,14 @@ function addToQuote(id, qty = 1, variant = null) {
 function changeCartQty(id, val) {
     const item = quoteCart.find(i => i.id == id);
     if (item) {
-        item.qty += val;
+        item.qty = Math.min(999, item.qty + val);
         if (item.qty < 1) {
             removeFromQuote(id);
         } else {
             saveQuote();
             renderQuoteItems();
             updateTotalItems();
+            updateCartCount();
         }
     }
 }
@@ -592,12 +610,13 @@ function removeFromQuote(id) {
 }
 
 function saveQuote() {
-    localStorage.setItem('ferrenorte_quote', JSON.stringify(quoteCart));
+    try { localStorage.setItem('ferrenorte_quote', JSON.stringify(quoteCart)); }
+    catch (error) { console.warn('La cotización se conservará solo durante esta visita.'); }
 }
 
 function updateCartCount() {
     const counts = document.querySelectorAll('.cart-count');
-    counts.forEach(c => c.textContent = quoteCart.length);
+    counts.forEach(c => c.textContent = quoteCart.reduce((total, item) => total + item.qty, 0));
 }
 
 function renderQuoteItems() {
@@ -617,10 +636,10 @@ function renderQuoteItems() {
 
     list.innerHTML = quoteCart.map(item => `
         <div class="quote-item">
-            <img src="${item.imagen}" alt="${item.titulo}" class="quote-item-img">
+            <img src="${escapeHTML(item.imagen)}" alt="${escapeHTML(item.titulo)}" class="quote-item-img">
             <div class="quote-item-info">
-                <div class="quote-item-title">${item.titulo}</div>
-                ${item.variante ? `<div style="font-size: 11px; color: var(--gray-500); margin-top: -3px; margin-bottom: 5px;">Opción: ${item.variante}</div>` : ''}
+                <div class="quote-item-title">${escapeHTML(item.titulo)}</div>
+                ${item.variante ? `<div style="font-size: 11px; color: var(--gray-500); margin-top: -3px; margin-bottom: 5px;">Opción: ${escapeHTML(item.variante)}</div>` : ''}
                 <div class="quote-item-price">${item.precio > 0 ? 'S/ ' + parseFloat(item.precio).toFixed(2) : 'Consultar precio'}</div>
                 <div class="quote-item-controls">
                     <div class="qty-control">
@@ -675,9 +694,16 @@ function initSearch() {
         document.getElementById('searchResultsDropdownMobile')
     ];
 
+    document.querySelectorAll('.searchBtn').forEach(button => button.addEventListener('click', () => {
+        mostrarSeccionesPrincipales();
+        mobileNavBackdrop?.click();
+        document.querySelectorAll('.search-results-dropdown').forEach(el => el.classList.remove('active'));
+        document.getElementById('productos').scrollIntoView({ behavior: 'smooth' });
+    }));
     inputs.forEach(input => {
         input.addEventListener('input', (e) => {
             const term = e.target.value.toLowerCase().trim();
+            renderProductos(productos.filter(p => p.titulo.toLowerCase().includes(term) || p.descripcion.toLowerCase().includes(term)));
 
             // Sincronizar el otro input
             inputs.forEach(other => { if (other !== input) other.value = e.target.value; });
@@ -718,9 +744,9 @@ function renderSearchDropdown(results) {
         } else {
             dropdown.innerHTML = results.map(p => `
                 <div class="search-result-item" onclick="verDetalleProducto(${p.id})">
-                    <img src="${p.imagen}" alt="${p.titulo}">
+                    <img src="${escapeHTML(p.imagen)}" alt="${escapeHTML(p.titulo)}">
                     <div class="search-result-info">
-                        <div class="search-result-title">${p.title || p.titulo}</div>
+                        <div class="search-result-title">${escapeHTML(p.title || p.titulo)}</div>
                         <div class="search-result-price">${p.precio > 0 ? 'S/ ' + parseFloat(p.precio).toFixed(2) : 'A Tratar'}</div>
                     </div>
                 </div>
@@ -1025,7 +1051,7 @@ if (contactForm) {
         alert('¡Gracias por contactarnos! Te redirigiremos a WhatsApp para completar tu consulta.');
 
         // Reset form
-        contactForm.reset();
+        // Mantener el mensaje hasta que el cliente complete el envío en WhatsApp.
     });
 }
 
@@ -1272,4 +1298,12 @@ document.addEventListener('DOMContentLoaded', async () => {
         try { initializeLazyLoading(); } catch (e) { }
         try { setActiveNav(); } catch (e) { }
     }, 100);
+});
+
+// Keyboard dismissal works for all overlays, including repeated openings.
+document.addEventListener('keydown', event => {
+    if (event.key !== 'Escape') return;
+    cerrarModalProducto();
+    closeQuoteSidebar();
+    mobileNavBackdrop?.click();
 });

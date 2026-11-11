@@ -2666,3 +2666,88 @@ textarea:focus-visible {
 .btn-primary:hover {
     box-shadow: 0 10px 22px rgba(217, 119, 6, 0.3);
 }
+
+/* Storefront: clear merchandising, practical navigation, less decorative noise. */
+:root { --primary-blue: #17365a; --primary-orange: #bf600c; --container-width: 1240px; }
+.skip-link { position: fixed; left: 12px; top: -100px; z-index: 4000; background: #fff; padding: 12px; }
+.skip-link:focus { top: 12px; }
+.header { position: sticky; background: #fff; backdrop-filter: none; }
+.navbar { padding: 15px 0; }
+.nav-container { gap: 22px; flex-wrap: wrap; }
+.logo { width: 50px; height: 50px; object-fit: contain; }
+.brand-main { font-size: 16px; letter-spacing: -.3px; }
+.brand-sub { font-size: 10px; letter-spacing: 2px; }
+.nav-menu { gap: 20px; }
+.nav-link { font-size: 13px; }
+.nav-actions { gap: 12px; }
+.desktop-search input { width: 145px; }
+.search-wrapper { border-radius: 6px; background: #f7f8fa; }
+.cart-toggle-btn { border-radius: 6px; }
+.hero { min-height: 0; padding: 65px 0; background: #eef2f3; }
+.hero-background, .hero-wave { display: none; }
+.hero-content { grid-template-columns: 1.05fr 1fr; gap: 60px; width: 100%; }
+.hero-text { color: #17365a; }
+.eyebrow { font-size: 11px; font-weight: 700; letter-spacing: 2px; color: #586b7b; margin-bottom: 22px; }
+.hero-title { font-size: clamp(32px, 3.7vw, 49px); letter-spacing: -1.7px; line-height: 1.12; margin-bottom: 22px; }
+.gradient-text { color: #b5550b; background: none; -webkit-text-fill-color: currentColor; }
+.hero-description { font-size: 15px; color: #536272; line-height: 1.8; max-width: 470px; margin-bottom: 26px; }
+.hero-buttons { gap: 12px; }
+.btn { border-radius: 6px; padding: 13px 22px; font-size: 13px; }
+.btn-primary { background: #17365a; color: white; box-shadow: none; }
+.btn-secondary { background: transparent; color: #17365a; border: 1px solid #a8b7bf; }
+.hero-trust { gap: 18px; flex-wrap: wrap; margin-top: 25px; }
+.trust-item { color: #536272; font-size: 11px; }
+.trust-item i { color: #b5550b; }
+.store-showcase { display: flex; flex-direction: column; height: auto; gap: 12px; }
+.showcase-main { position: relative; display: block; border-radius: 10px; overflow: hidden; background: #fff; }
+.showcase-main img { width: 100%; height: 260px; object-fit: cover; }
+.showcase-label { display: block; padding: 18px 22px; color: #17365a; background: #fff; }
+.showcase-label small, .showcase-link small { display: block; font-size: 9px; letter-spacing: 1.8px; margin-bottom: 4px; }
+.showcase-label strong { display: flex; justify-content: space-between; font-size: 18px; }
+.showcase-link { display: flex; align-items: center; justify-content: space-between; background: #17365a; color: white; padding: 18px 22px; border-radius: 8px; }
+.showcase-link strong { font-size: 14px; }
+.service-strip { border-bottom: 1px solid #e3e8ec; background: #fff; padding: 25px 0; }
+.service-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 35px; }
+.service-grid>div { display: flex; align-items: center; gap: 15px; }
+.service-grid>div>span { color: #b5550b; font-size: 23px; font-weight: 700; }
+.service-grid p { font-size: 11px; color: #65737e; }
+.service-grid strong { display: block; color: #17365a; font-size: 13px; }
+.featured-section, .categories-section, .about-section, .contact-section { padding: 65px 0; }
+.section-header { text-align: left; margin-bottom: 30px; }
+.section-title { font-size: clamp(26px, 3vw, 34px); letter-spacing: -.8px; color: #17365a; }
+.section-title::after { display: none; }
+.section-subtitle { color: #63717e; font-size: 14px; margin-top: 10px; }
+.catalog-note { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 15px; padding-bottom: 18px; border-bottom: 1px solid #e4e8ed; margin-bottom: 24px; font-size: 11px; font-weight: 700; letter-spacing: 1px; }
+.catalog-note a { color: #b5550b; letter-spacing: 0; }
+.products-grid { grid-template-columns: repeat(4, minmax(0,1fr)); gap: 20px; }
+.product-card, .category-card { border-radius: 8px; box-shadow: none; border: 1px solid #dfe5ea; }
+.product-card:hover, .category-card:hover { transform: translateY(-3px); box-shadow: 0 8px 22px #17365a12; }
+.product-image { height: 210px; background: #fafbfc; }
+.product-image img { padding: 16px; mix-blend-mode: multiply; }
+.product-card .btn-add-pill { border-radius: 5px!important; color: #17365a!important; border-color: #ccd6de!important; }
+.product-card .btn-add-pill:hover { background: #17365a!important; color: white!important; }
+.categories-section { background: #f5f7f8; }
+.category-icon { border-radius: 8px; background: #edf2f7; color: #17365a; box-shadow: none; }
+.category-btn { border-radius: 5px; }
+.footer { background: #122b46; }
+@media (max-width:1100px) {
+ .nav-container { gap: 14px; } .brand-name { max-width: 160px; } .brand-main { font-size: 13px; }
+ .nav-menu { gap: 12px; } .desktop-search input { width: 100px; }
+ .hero-content { gap: 30px; } .products-grid { grid-template-columns: repeat(3,minmax(0,1fr)); }
+}
+@media (max-width:768px) {
+ .header { position: sticky; } .nav-container { flex-wrap: nowrap; }
+ .hero { padding: 32px 0; } .hero-content { grid-template-columns: 1fr; gap: 26px; text-align: left; }
+ .hero-title { font-size: 36px; } .hero-description { max-width: 100%; font-size: 14px; }
+ .hero-buttons { flex-direction: row; justify-content: flex-start; flex-wrap: wrap; }
+ .hero-trust { justify-content: flex-start; } .store-showcase { display: flex; }
+ .showcase-main img { height: 190px; } .showcase-label strong { font-size: 16px; }
+ .service-grid { grid-template-columns: 1fr; gap: 18px; }
+ .service-strip { padding: 24px 0; } .service-grid p { font-size: 12px; }
+ .featured-section, .categories-section, .about-section, .contact-section { padding: 40px 0; }
+ .products-grid { grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px; }
+ .product-image { height: 160px; } .product-content { padding: 12px!important; }
+ .product-card .price-main { font-size: 20px!important; } .product-card .price-consult { font-size: 13px!important; }
+ .search-results-dropdown { width: min(320px, 85vw); }
+ .eyebrow { font-size: 10px; letter-spacing: 1px; }
+}

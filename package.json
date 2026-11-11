@@ -1,0 +1,14 @@
+{
+  "name": "grupo-ferrenorte-storefront",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "test": "node --test tests/*.test.cjs",
+    "check": "node --check script.js && node --check admin-script.js && node --check supabase-config.js && npm test",
+    "start": "python3 -m http.server 8766",
+    "build": "node scripts/build.cjs"
+  },
+  "devDependencies": {
+    "jsdom": "26.1.0"
+  }
+}

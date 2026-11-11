@@ -18,3 +18,7 @@ desktop.ini
 # No ignorar las credenciales de Supabase
 # (son seguras de exponer porque usamos RLS)
 # !supabase-config.js
+
+node_modules/
+.vercel/
+dist/

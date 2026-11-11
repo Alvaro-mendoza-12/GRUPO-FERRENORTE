@@ -45,6 +45,7 @@
 </head>
 
 <body id="top">
+    <a class="skip-link" href="#productos">Saltar al catálogo</a>
     <!-- Header Navigation -->
     <header class="header" id="header">
         <nav class="navbar">
@@ -67,8 +68,8 @@
                 <ul class="nav-menu" id="navMenu">
                     <li class="mobile-search-li">
                         <div class="search-wrapper mobile-search">
-                            <input type="text" class="searchInput" placeholder="Buscar...">
-                            <button class="searchBtn"><i class="fas fa-search"></i></button>
+                            <input type="text" class="searchInput" aria-label="Buscar productos" placeholder="Buscar...">
+                            <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search"></i></button>
                             <div class="search-results-dropdown mobile" id="searchResultsDropdownMobile"></div>
                         </div>
                     </li>
@@ -81,11 +82,11 @@
 
                 <div class="nav-actions">
                     <div class="search-wrapper desktop-search">
-                        <input type="text" class="searchInput" placeholder="Buscar productos...">
-                        <button class="searchBtn"><i class="fas fa-search"></i></button>
+                        <input type="text" class="searchInput" aria-label="Buscar productos" placeholder="Buscar productos...">
+                        <button class="searchBtn" aria-label="Buscar en el catálogo"><i class="fas fa-search"></i></button>
                         <div class="search-results-dropdown" id="searchResultsDropdown"></div>
                     </div>
-                    <button id="cartToggleBtn" class="cart-toggle-btn">
+                    <button aria-label="Abrir lista de cotización" id="cartToggleBtn" class="cart-toggle-btn">
                         <i class="fas fa-file-invoice"></i>
                         <span class="cart-count">0</span>
                         <span class="cart-text">Cotizar</span>
@@ -104,9 +105,10 @@
         <div class="hero-background"></div>
         <div class="container hero-content">
             <div class="hero-text">
+                <p class="eyebrow">FERRETERÍA · IMPLEMENTACIÓN COMERCIAL</p>
                 <h1 class="hero-title">
-                    <span class="title-line" id="heroTitleLine1">Soluciones Profesionales</span>
-                    <span class="title-line gradient-text" id="heroTitleLine2">Para Tu Negocio</span>
+                    <span class="title-line" id="heroTitleLine1">Tu negocio empieza</span>
+                    <span class="title-line gradient-text" id="heroTitleLine2">con buenas herramientas.</span>
                 </h1>
                 <p class="hero-description" id="heroDescription">
                     Expertos en productos ferreteros, muebles para implementación comercial y accesorios especializados.
@@ -137,19 +139,12 @@
                     </div>
                 </div>
             </div>
-            <div class="hero-visual">
-                <div class="floating-card card-1">
-                    <i class="fas fa-tools"></i>
-                    <span>Herramientas Profesionales</span>
-                </div>
-                <div class="floating-card card-2">
-                    <i class="fas fa-warehouse"></i>
-                    <span>Muebles Comerciales</span>
-                </div>
-                <div class="floating-card card-3">
-                    <i class="fas fa-shopping-cart"></i>
-                    <span>Accesorios</span>
-                </div>
+            <div class="hero-visual store-showcase">
+                <a class="showcase-main" href="#productos">
+                    <img src="img/PRODUCTOS FERRETEROS/heramientas.jpeg" alt="Herramientas para equipar tu negocio" fetchpriority="high" width="542" height="364">
+                    <span class="showcase-label"><small>EQUIPA TU PRÓXIMO PROYECTO</small><strong>Herramientas profesionales <span aria-hidden="true">↗</span></strong></span>
+                </a>
+                <a class="showcase-link" href="#categorias"><span><small>EXHIBE. ORGANIZA. CRECE.</small><strong>Mobiliario y accesorios comerciales</strong></span><span aria-hidden="true">↗</span></a>
             </div>
         </div>
         <div class="hero-wave">
@@ -166,47 +161,11 @@
         </div>
     </section>
 
-    <!-- Stats Section -->
-    <section class="stats-section">
-        <div class="container">
-            <div class="stats-grid">
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-box"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 class="stat-number" data-target="500">0</h3>
-                        <p class="stat-label">Productos</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-users"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 class="stat-number" data-target="1000">0</h3>
-                        <p class="stat-label">Clientes Satisfechos</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-star"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 class="stat-number" data-target="15">0</h3>
-                        <p class="stat-label">Años de Experiencia</p>
-                    </div>
-                </div>
-                <div class="stat-card">
-                    <div class="stat-icon">
-                        <i class="fas fa-truck"></i>
-                    </div>
-                    <div class="stat-content">
-                        <h3 class="stat-number" data-target="100">0</h3>
-                        <p class="stat-label">Entregas Mensuales</p>
-                    </div>
-                </div>
-            </div>
+    <section class="service-strip" aria-label="Cómo comprar">
+        <div class="container service-grid">
+            <div><span>01</span><p><strong>Encuentra lo que necesitas</strong>Explora herramientas y equipamiento.</p></div>
+            <div><span>02</span><p><strong>Arma tu cotización</strong>Elige productos, opciones y cantidades.</p></div>
+            <div><span>03</span><p><strong>Conversa con un asesor</strong>Confirma precios y entrega por WhatsApp.</p></div>
         </div>
     </section>
 
@@ -214,11 +173,12 @@
     <section class="featured-section" id="productos">
         <div class="container">
             <div class="section-header">
-                <h2 class="section-title">Productos Destacados</h2>
-                <p class="section-subtitle">Calidad y variedad para todas tus necesidades</p>
+                <h2 class="section-title">Encuentra lo que tu negocio necesita</h2>
+                <p class="section-subtitle">Explora nuestro catálogo y solicita una cotización personalizada. Sin pagos en línea.</p>
             </div>
 
-            <div class="products-grid" id="productsGrid">
+            <div class="catalog-note"><span>CATÁLOGO DE PRODUCTOS</span><a href="#categorias">Explorar categorías ↗</a></div>
+            <div class="products-grid" id="productsGrid" aria-live="polite" aria-label="Catálogo de productos">
                 <!-- Los productos se cargarán dinámicamente desde script.js -->
             </div>
         </div>
@@ -274,7 +234,7 @@
                     <h2 class="section-title">Sobre Nosotros</h2>
                     <h3 class="about-company">GRUPO FERRENORTE RO&MY E.I.R.L</h3>
                     <p class="about-description">
-                        Somos una empresa líder en la distribución de productos ferreteros y soluciones para
+                        Somos una empresa dedicada a la distribución de productos ferreteros y soluciones para
                         implementación comercial.
                         Con años de experiencia en el mercado, nos especializamos en brindar productos de alta calidad
                         que satisfacen
@@ -285,7 +245,7 @@
                             <i class="fas fa-check-circle"></i>
                             <div>
                                 <h4>Calidad Garantizada</h4>
-                                <p>Productos certificados de las mejores marcas</p>
+                                <p>Herramientas y soluciones para tu negocio</p>
                             </div>
                         </div>
                         <div class="feature-item">
@@ -507,7 +467,7 @@
     </a>
 
     <!-- Product Detail Modal -->
-    <div id="productDetailModal" class="product-modal-overlay">
+    <div id="productDetailModal" role="dialog" aria-modal="true" aria-labelledby="modalProductTitle" class="product-modal-overlay">
         <div class="product-modal-content">
             <button class="modal-close-btn" onclick="cerrarModalProducto()">&times;</button>
             <div class="product-detail-grid">
@@ -540,7 +500,7 @@
                             Cantidad:</label>
                         <div class="qty-control">
                             <button type="button" onclick="changeModalQty(-1)">-</button>
-                            <input type="number" id="modalQty" value="1" min="1" readonly>
+                            <input type="number" id="modalQty" aria-label="Cantidad a cotizar" max="999" value="1" min="1" readonly>
                             <button type="button" onclick="changeModalQty(1)">+</button>
                         </div>
                     </div>
